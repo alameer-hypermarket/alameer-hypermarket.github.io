@@ -569,6 +569,13 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- التبويب 3: إعدادات المتجر والدفع -->
+                <div id="adminPanel-settings" class="hidden max-w-2xl mx-auto">
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 space-y-5">
+                        <h3 class="text-base font-extrabold text-slate-900 pb-3 border-b border-slate-100">أرقام الواتساب والمحافظ الإلكترونية وإنستاباي</h3>
                         <!-- لون المتجر -->
                         <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
@@ -581,13 +588,6 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 <button onclick="resetThemeColor()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer">الأحمر الافتراضي</button>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- التبويب 3: إعدادات المتجر والدفع -->
-                <div id="adminPanel-settings" class="hidden max-w-2xl mx-auto">
-                    <div class="bg-white p-6 rounded-2xl border border-slate-200 space-y-5">
-                        <h3 class="text-base font-extrabold text-slate-900 pb-3 border-b border-slate-100">أرقام الواتساب والمحافظ الإلكترونية وإنستاباي</h3>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
@@ -1764,7 +1764,11 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
 
             emptyState.classList.add('hidden');
-            grid.innerHTML = filtered.map(product => {
+            const pgKey = [state.selectedCategory, state.selectedOrigin, state.searchQuery, state.sortMode].join('|');
+            if (window.__pgKey !== pgKey) { window.__pgKey = pgKey; window.__shown = 48; }
+            const shownCount = Math.min(filtered.length, window.__shown || 48);
+            const hasMore = shownCount < filtered.length;
+            grid.innerHTML = filtered.slice(0, shownCount).map(product => {
                 const pid = String(product.id);
                 const qty = state.cart[pid] || 0;
                 const isAvailable = product.available !== false;
@@ -1830,7 +1834,16 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                         </div>
                     </div>
                 `;
-            }).join('');
+            }).join('') + (hasMore ? '<div id="moreSentinel" style="grid-column:1/-1;height:48px"></div>' : '');
+            if (hasMore) {
+                const sent = document.getElementById('moreSentinel');
+                if ('IntersectionObserver' in window) {
+                    const io = new IntersectionObserver(function (en) {
+                        if (en[0].isIntersecting) { io.disconnect(); window.__shown += 48; renderProducts(); }
+                    }, { rootMargin: '900px' });
+                    io.observe(sent);
+                } else { window.__shown = filtered.length; }
+            }
         }
 
         // =====================================================================
