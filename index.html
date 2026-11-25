@@ -3033,6 +3033,7 @@
                         </div>
                     </div>
 
+                    <div id="adminOrderStats"></div>
                     <div id="adminOrdersList" class="space-y-3">
                         <!-- تتولد الطلبات هنا -->
                     </div>
@@ -4730,8 +4731,44 @@ ${itemsLines}━━━━━━━━━━━━━━
             showToast('تم حفظ ومزامنة الإعدادات والأرقام');
         };
 
+        function renderOrderStats() {
+            const box = document.getElementById('adminOrderStats');
+            if (!box) return;
+            const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const orders = state.orders || [];
+            if (orders.length === 0) { box.innerHTML = ''; return; }
+            const sold = {};
+            let revenue = 0;
+            orders.forEach(o => {
+                revenue += Number(o.total) || 0;
+                String(o.itemsSummary || '').split('، ').forEach(part => {
+                    const m = part.trim().match(/^(.*)\s\(×(\d+)\)$/);
+                    if (m) sold[m[1].trim()] = (sold[m[1].trim()] || 0) + Number(m[2]);
+                });
+            });
+            const ranked = Object.entries(sold).sort((a, b) => b[1] - a[1]);
+            const best = ranked.slice(0, 5);
+            const names = new Set(Object.keys(sold));
+            const slow = (state.products || []).filter(p => !names.has(String(p.name).trim())).slice(0, 12);
+            const avg = Math.round(revenue / orders.length);
+            const row = (n, q) => '<div class="flex justify-between text-xs py-1 border-b border-slate-100"><span>' + esc(n) + '</span><span class="font-bold text-primary-700">' + q + '</span></div>';
+            box.innerHTML =
+                '<div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">' +
+                '<h3 class="text-sm font-extrabold text-slate-900">إحصائيات الطلبات</h3>' +
+                '<div class="grid grid-cols-3 gap-2 text-center">' +
+                '<div class="bg-slate-50 rounded-xl p-2"><div class="text-[11px] text-slate-500">عدد الطلبات</div><div class="text-base font-extrabold">' + orders.length + '</div></div>' +
+                '<div class="bg-slate-50 rounded-xl p-2"><div class="text-[11px] text-slate-500">إجمالي المبيعات</div><div class="text-base font-extrabold">' + revenue + ' ج.م</div></div>' +
+                '<div class="bg-slate-50 rounded-xl p-2"><div class="text-[11px] text-slate-500">متوسط الطلب</div><div class="text-base font-extrabold">' + avg + ' ج.م</div></div>' +
+                '</div>' +
+                '<div><div class="text-xs font-bold text-slate-700 mb-1">الأكثر مبيعاً</div>' + best.map(b => row(b[0], '×' + b[1])).join('') + '</div>' +
+                '<div><div class="text-xs font-bold text-slate-700 mb-1">منتجات لم تُطلب بعد (' + slow.length + (slow.length === 12 ? '+' : '') + ')</div>' +
+                (slow.length ? slow.map(p => row(p.name, '')).join('') : '<div class="text-xs text-slate-500">كل المنتجات اتطلبت</div>') + '</div>' +
+                '</div>';
+        }
+
         function renderAdminOrders() {
             const container = document.getElementById('adminOrdersList');
+            renderOrderStats();
             document.getElementById('adminOrdersCountBadge').textContent = state.orders.length;
 
             if (state.orders.length === 0) {
