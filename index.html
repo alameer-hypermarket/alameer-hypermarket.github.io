@@ -4794,10 +4794,10 @@ ${itemsLines}━━━━━━━━━━━━━━
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', bootstrapApp);
-            document.addEventListener('DOMContentLoaded', function(){ if (/[?&]admin(=|&|$)/.test(location.search)) setTimeout(function(){ if (window.openAdminGate) window.openAdminGate(); }, 700); });
         } else {
             bootstrapApp();
         }
+        if (/[?&]admin(=|&|$)/.test(location.search)) { setTimeout(function(){ if (window.openAdminGate) window.openAdminGate(); }, 1200); }
     </script>
 
 </body></html>
