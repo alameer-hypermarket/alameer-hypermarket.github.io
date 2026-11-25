@@ -186,7 +186,7 @@
         <!-- عنوان القسم وعدد المنتجات -->
         <div class="flex items-center justify-between mb-4">
             <h3 id="currentCategoryTitle" class="text-base sm:text-lg font-extrabold text-slate-900">جميع المنتجات</h3>
-            <span id="resultsCount" class="text-xs font-semibold text-slate-500">63 منتج</span>
+            <span id="resultsCount" class="text-xs font-semibold text-slate-500"></span>
         </div>
 
         <!-- شبكة المنتجات -->
@@ -724,7 +724,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // مفاتيح التخزين المحلي
         const LOCAL_KEYS = {
@@ -1077,7 +1077,7 @@
             try {
                 const app = initializeApp(FIREBASE_CONFIG);
                 auth = getAuth(app);
-                db = getFirestore(app);
+                try { db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }); } catch (e) { db = getFirestore(app); }
 
                 const cred = await signInAnonymously(auth);
                 state.user = cred.user;
@@ -2373,6 +2373,11 @@ ${itemsLines}━━━━━━━━━━━━━━
             renderProducts();
             updateCartUI();
             initFirebaseSync();
+            fetch('/products.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(list => {
+                if (!Array.isArray(list) || !list.length) return;
+                state.products = mergeProductsSafely(list);
+                renderCategories(); renderProducts(); updateCartUI();
+            }).catch(() => {});
         }
 
         if (document.readyState === 'loading') {
