@@ -1,9 +1,21 @@
 <!DOCTYPE html><html lang="ar" dir="rtl"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>هايبر ماركت الأمير | تسوق أونلاين</title>
-    <meta name="description" content="هايبر ماركت الأمير: منتجات مصرية ومستوردة، مواد غذائية ومنظفات ومشروبات، توصيل سريع والدفع كاش أو محفظة إلكترونية أو إنستاباي. اطلب أونلاين عبر واتساب.">
-    <meta property="og:title" content="هايبر ماركت الأمير | تسوق أونلاين">
+    <title>هايبر ماركت الأمير | سوبر ماركت أونلاين وتوصيل لحد البيت</title>
+    <meta name="description" content="اطلب مواد غذائية ومنظفات ومشروبات وألبان وسناكس بأسعار السوق من هايبر ماركت الأمير. توصيل لمنطقتك والدفع كاش أو محفظة إلكترونية أو إنستاباي، والطلب يوصل على واتساب.">
+    <meta property="og:title" content="هايبر ماركت الأمير | سوبر ماركت أونلاين وتوصيل لحد البيت">
+    <meta property="og:description" content="اطلب مواد غذائية ومنظفات ومشروبات وألبان وسناكس بأسعار السوق. توصيل لمنطقتك والطلب على واتساب.">
+    <meta property="og:url" content="https://alameer-hypermarket.pages.dev/">
+    <meta property="og:locale" content="ar_EG">
+    <meta property="og:site_name" content="هايبر ماركت الأمير">
+    <meta property="og:image" content="https://alameer-hypermarket.pages.dev/1-og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://alameer-hypermarket.pages.dev/1-og-image.png">
+    <meta name="theme-color" content="#047857">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23047857'/%3E%3Ctext x='32' y='47' font-size='40' font-weight='800' text-anchor='middle' fill='white' font-family='Arial,sans-serif'%3E%D8%A3%3C/text%3E%3C/svg%3E">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"GroceryStore","name":"هايبر ماركت الأمير","url":"https://alameer-hypermarket.pages.dev/","telephone":"+201063796906","priceRange":"EGP","description":"سوبر ماركت أونلاين: مواد غذائية ومنظفات ومشروبات وسناكس مع توصيل لمنطقتك.","areaServed":"EG","currenciesAccepted":"EGP"}</script>
     <meta property="og:type" content="website">
     <link rel="canonical" href="https://alameer-hypermarket.pages.dev/">
     <!-- خط Cairo العربي من Google Fonts -->
@@ -74,10 +86,8 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <!-- الشعار واسم المتجر -->
                 <a href="#" onclick="resetAllFilters(); return false;" class="flex items-center gap-3 min-w-0">
-                    <div class="w-10 h-10 rounded-xl bg-primary-700 text-white flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                        </svg>
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-primary-800 text-white flex items-center justify-center shadow-sm ring-2 ring-emerald-100">
+                        <span class="text-2xl font-extrabold leading-none" style="margin-top:-2px">أ</span>
                     </div>
                     <div>
                         <h1 id="headerStoreName" class="text-base sm:text-xl font-extrabold text-slate-900 leading-none">هايبر ماركت الأمير</h1>
@@ -144,6 +154,12 @@
         </div>
     </section>
 
+    <!-- عروض المتجر (من الأدمن) -->
+    <section id="offersSection" class="hidden max-w-7xl mx-auto px-4 pt-3 pb-1">
+        <h2 class="text-base sm:text-lg font-extrabold text-slate-900 mb-2.5">🔥 العروض</h2>
+        <div id="offersList" class="flex gap-3 overflow-x-auto pb-2 snap-x"></div>
+    </section>
+
     <!-- قسم المنتجات والفلاتر -->
     <main id="productsSection" class="max-w-7xl mx-auto px-4 py-5">
         <!-- شريط الأقسام وفلتر المنشأ -->
@@ -186,7 +202,15 @@
         <!-- عنوان القسم وعدد المنتجات -->
         <div class="flex items-center justify-between mb-4">
             <h3 id="currentCategoryTitle" class="text-base sm:text-lg font-extrabold text-slate-900">جميع المنتجات</h3>
-            <span id="resultsCount" class="text-xs font-semibold text-slate-500"></span>
+            <div class="flex items-center gap-2">
+                <select id="sortSelect" onchange="setSortMode(this.value)" class="text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer">
+                    <option value="default">الترتيب: الافتراضي</option>
+                    <option value="priceAsc">السعر: الأقل أولاً</option>
+                    <option value="priceDesc">السعر: الأعلى أولاً</option>
+                    <option value="nameAsc">الاسم: أ إلى ي</option>
+                </select>
+                <span id="resultsCount" class="text-xs font-semibold text-slate-500"></span>
+            </div>
         </div>
 
         <!-- شبكة المنتجات -->
@@ -431,6 +455,9 @@
             <button onclick="switchAdminTab('settings')" id="adminTab-settings" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer">
                 إعدادات المتجر والدفع
             </button>
+            <button onclick="switchAdminTab('offers')" id="adminTab-offers" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition whitespace-nowrap cursor-pointer">
+                العروض
+            </button>
             <button onclick="switchAdminTab('orders')" id="adminTab-orders" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer flex items-center gap-1.5">
                 <span>سجل الطلبات</span>
                 <span id="adminOrdersCountBadge" class="bg-slate-100 text-slate-700 text-[11px] px-2 py-0.5 rounded-full">0</span>
@@ -568,6 +595,19 @@
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <!-- تبويب العروض -->
+                <div id="adminPanel-offers" class="hidden max-w-2xl mx-auto space-y-4">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+                        <h3 class="text-base font-extrabold text-slate-900">إضافة عرض جديد</h3>
+                        <input id="offerTitle" type="text" placeholder="عنوان العرض (مثال: عرض الويك إند)" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                        <textarea id="offerText" rows="2" placeholder="تفاصيل العرض (اختياري)" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm"></textarea>
+                        <input id="offerBadge" type="text" placeholder="شارة الخصم (مثال: خصم 20% أو 99 ج.م بدل 120)" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                        <input id="offerProducts" type="text" placeholder="أرقام المنتجات في العرض مفصولة بفاصلة (اختياري، مثال: 1,5,12)" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" dir="ltr">
+                        <button onclick="addOffer()" class="w-full bg-primary-700 hover:bg-primary-800 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer">+ إضافة العرض</button>
+                    </div>
+                    <div id="adminOffersList" class="space-y-3"></div>
                 </div>
 
                 <!-- التبويب 4: سجل الطلبات -->
@@ -1366,9 +1406,85 @@
             return clean;
         }
 
+
+        window.setSortMode = function(v) { state.sortMode = v; renderProducts(); };
+
+        const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+        function renderOffers() {
+            const sec = document.getElementById('offersSection');
+            const box = document.getElementById('offersList');
+            if (!sec || !box) return;
+            const offers = Array.isArray(state.config.offers) ? state.config.offers : [];
+            if (offers.length === 0) { sec.classList.add('hidden'); box.innerHTML = ''; return; }
+            sec.classList.remove('hidden');
+            box.innerHTML = offers.map(o => {
+                const ids = String(o.productIds || '').split(',').map(s => s.trim()).filter(Boolean);
+                const prods = ids.map(id => (state.products || []).find(p => String(p.id) === id)).filter(Boolean);
+                const prodHtml = prods.length ? `<div class="mt-2 space-y-1">${prods.map(p => `
+                    <div class="flex items-center justify-between gap-2 text-xs bg-white/70 rounded-lg px-2 py-1">
+                        <span class="font-semibold text-slate-800 truncate">${escH(p.name)} · ${escH(p.price)} ج.م</span>
+                        ${p.available === false ? '' : `<button onclick="addToCart('${escH(p.id)}')" class="shrink-0 bg-primary-700 text-white font-bold rounded-md px-2 py-0.5 cursor-pointer">+ للسلة</button>`}
+                    </div>`).join('')}</div>` : '';
+                return `<div class="snap-start shrink-0 w-72 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
+                    ${o.badge ? `<span class="inline-block bg-rose-600 text-white text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg mb-1.5">${escH(o.badge)}</span>` : ''}
+                    <h3 class="font-extrabold text-slate-900 text-sm">${escH(o.title)}</h3>
+                    ${o.text ? `<p class="text-xs text-slate-600 mt-1 leading-relaxed">${escH(o.text)}</p>` : ''}
+                    ${prodHtml}
+                </div>`;
+            }).join('');
+        }
+
+        function renderAdminOffers() {
+            const box = document.getElementById('adminOffersList');
+            if (!box) return;
+            const offers = Array.isArray(state.config.offers) ? state.config.offers : [];
+            if (offers.length === 0) {
+                box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500 text-sm">لا توجد عروض حالياً.</div>';
+                return;
+            }
+            box.innerHTML = offers.map(o => `
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 flex items-start justify-between gap-3">
+                    <div class="text-xs space-y-1">
+                        <p class="font-extrabold text-slate-900 text-sm">${escH(o.title)} ${o.badge ? `<span class="bg-rose-600 text-white px-2 py-0.5 rounded-lg text-[11px]">${escH(o.badge)}</span>` : ''}</p>
+                        ${o.text ? `<p class="text-slate-600">${escH(o.text)}</p>` : ''}
+                        ${o.productIds ? `<p class="text-slate-400" dir="ltr">منتجات: ${escH(o.productIds)}</p>` : ''}
+                    </div>
+                    <button onclick="deleteOffer('${escH(o.id)}')" class="shrink-0 text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 rounded-lg px-2.5 py-1 cursor-pointer">🗑 مسح</button>
+                </div>`).join('');
+        }
+
+        window.addOffer = async function() {
+            const title = document.getElementById('offerTitle').value.trim();
+            if (!title) { showToast('اكتب عنوان العرض'); return; }
+            const offer = {
+                id: 'o' + Date.now(),
+                title,
+                text: document.getElementById('offerText').value.trim(),
+                badge: document.getElementById('offerBadge').value.trim(),
+                productIds: document.getElementById('offerProducts').value.trim()
+            };
+            state.config.offers = [...(Array.isArray(state.config.offers) ? state.config.offers : []), offer];
+            await syncConfigToCloud();
+            ['offerTitle', 'offerText', 'offerBadge', 'offerProducts'].forEach(id => { document.getElementById(id).value = ''; });
+            renderAdminOffers();
+            renderOffers();
+            showToast('تم إضافة العرض');
+        };
+
+        window.deleteOffer = async function(id) {
+            if (!confirm('متأكد إنك عايز تمسح العرض ده؟')) return;
+            state.config.offers = (state.config.offers || []).filter(o => o.id !== id);
+            await syncConfigToCloud();
+            renderAdminOffers();
+            renderOffers();
+            showToast('تم مسح العرض');
+        };
+
         function applyConfigToUI() {
             const { primary, p1, p2 } = getPrimaryAndSecondaryPhones();
             document.getElementById('headerStoreName').textContent = state.config.storeName;
+            renderOffers();
             document.getElementById('footerStoreName').textContent = state.config.storeName;
             document.getElementById('topPhoneDisplay').textContent = primary;
             document.getElementById('footerPhonesDisplay').textContent = `${p1} / ${p2}`;
@@ -1487,7 +1603,13 @@
                 return matchCat && matchOrigin && matchSearch;
             });
 
+            const sm = state.sortMode || 'default';
+            if (sm === 'priceAsc') filtered.sort((a, b) => Number(a.price) - Number(b.price));
+            else if (sm === 'priceDesc') filtered.sort((a, b) => Number(b.price) - Number(a.price));
+            else if (sm === 'nameAsc') filtered.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'));
+
             document.getElementById('resultsCount').textContent = `${filtered.length} منتج`;
+            renderOffers();
 
             if (filtered.length === 0) {
                 grid.innerHTML = '';
@@ -1909,7 +2031,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         };
 
         window.switchAdminTab = function(tabName) {
-            ['products', 'zones', 'settings', 'orders'].forEach(t => {
+            ['products', 'zones', 'settings', 'offers', 'orders'].forEach(t => {
                 document.getElementById(`adminPanel-${t}`).classList.toggle('hidden', t !== tabName);
                 const btn = document.getElementById(`adminTab-${t}`);
                 if (t === tabName) {
@@ -1923,6 +2045,7 @@ ${itemsLines}━━━━━━━━━━━━━━
             if (tabName === 'products') renderAdminProductsTable();
             if (tabName === 'zones') renderAdminZonesList();
             if (tabName === 'orders') renderAdminOrders();
+            if (tabName === 'offers') renderAdminOffers();
         };
 
         window.renderAdminProductsTable = function() {
