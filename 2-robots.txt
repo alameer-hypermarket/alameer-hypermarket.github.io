@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://alameer-hypermarket.github.io/sitemap.xml
