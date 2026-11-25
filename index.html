@@ -8,18 +8,18 @@
     <meta property="og:url" content="https://alameer-hypermarket.pages.dev/">
     <meta property="og:locale" content="ar_EG">
     <meta property="og:site_name" content="هايبر ماركت الأمير">
-    <meta property="og:image" content="https://alameer-hypermarket.pages.dev/og-image-red.png">
+    <meta property="og:image" content="https://alameer-hypermarket.pages.dev/og-image-navy.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="https://alameer-hypermarket.pages.dev/og-image-red.png">
-    <meta name="theme-color" content="#b91c1c">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b91c1c'/%3E%3Ctext x='32' y='47' font-size='40' font-weight='800' text-anchor='middle' fill='white' font-family='Arial,sans-serif'%3E%D8%A3%3C/text%3E%3C/svg%3E">
+    <meta name="twitter:image" content="https://alameer-hypermarket.pages.dev/og-image-navy.png">
+    <meta name="theme-color" content="#0f2a5c">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f2a5c'/%3E%3Ctext x='32' y='47' font-size='40' font-weight='800' text-anchor='middle' fill='white' font-family='Arial,sans-serif'%3E%D8%A3%3C/text%3E%3C/svg%3E">
     <script>
 try{if(localStorage.getItem('al_ameer_dark')==='1')document.documentElement.classList.add('dark')}catch(e){}
 window.applyTheme=function(hex){
   try{
-    if(!/^#[0-9a-fA-F]{6}$/.test(hex||''))hex='#b91c1c';
+    if(!/^#[0-9a-fA-F]{6}$/.test(hex||''))hex='#0f2a5c';
     var c=[1,3,5].map(function(i){return parseInt(hex.substr(i,2),16)});
     function mix(a,b,t){return a.map(function(v,i){return Math.round(v+(b[i]-v)*t)})}
     var W=[255,255,255],K=[0,0,0],r=document.documentElement.style;
@@ -51,7 +51,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
         .dark .imgbox{background-color:#fff}.dark .bg-slate-900{background-color:#334155}
         .dark input,.dark select,.dark textarea{background-color:#1e2a40;color:#f1f5f9}
         .dark #darkBtn{background-color:#1e2a40}
-        .dark .bg-primary-50{background-color:#2a1416}.dark .text-primary-700{color:#f87171}.dark .bg-primary-700 .text-primary-700{color:#fff}
+        .dark .bg-primary-50{background-color:#14233f}.dark .text-primary-700{color:#8fb0ee}.dark .bg-primary-700 .text-primary-700{color:#fff}.dark .bg-primary-700{background-color:#2a55b0}.dark .hover\:bg-primary-800:hover{background-color:#3566c8}.dark .bg-primary-800{background-color:#1b3a75}.dark .accent-primary-700{accent-color:#5b86d6}
         :root{--p50:254 242 242;--p100:254 226 226;--p600:220 38 38;--p700:185 28 28;--p800:153 27 27}
         body {
             font-family: 'Cairo', sans-serif;
@@ -575,9 +575,9 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 <p class="text-[11px] text-slate-500">يتغير لون الأزرار والهيدر والأقسام فوراً لكل الزوار</p>
                             </div>
                             <div class="flex items-center gap-2">
-                                <input type="color" id="setPrimaryColorInput" value="#b91c1c" oninput="applyTheme(this.value)" class="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer bg-white">
+                                <input type="color" id="setPrimaryColorInput" value="#0f2a5c" oninput="applyTheme(this.value)" class="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer bg-white">
                                 <button onclick="saveThemeColor()" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer">حفظ اللون</button>
-                                <button onclick="resetThemeColor()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer">الأحمر الافتراضي</button>
+                                <button onclick="resetThemeColor()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer">الكحلي الافتراضي</button>
                             </div>
                         </div>
 
@@ -845,7 +845,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
 
         // الأقسام الرئيسية للمتجر
         const CATEGORIES = [
-            { id: 'all', name: 'الكل', icon: '🛒', bg: '#fee2e2' },
+            { id: 'all', name: 'الكل', icon: '🛒', bg: '#dbe5fa' },
             { id: 'groceries', name: 'مواد غذائية', icon: '🍚', bg: '#fef3c7' },
             { id: 'dairy', name: 'ألبان وبيض', icon: '🥛', bg: '#e0f2fe' },
             { id: 'frozen', name: 'مجمدات', icon: '🧊', bg: '#cffafe' },
@@ -2594,12 +2594,12 @@ ${itemsLines}━━━━━━━━━━━━━━
             showToast('تم حفظ لون المتجر');
         };
         window.resetThemeColor = async function() {
-            document.getElementById('setPrimaryColorInput').value = '#b91c1c';
+            document.getElementById('setPrimaryColorInput').value = '#0f2a5c';
             await window.saveThemeColor();
         };
 
         function populateAdminSettingsForm() {
-            document.getElementById('setPrimaryColorInput').value = state.config.primaryColor || '#b91c1c';
+            document.getElementById('setPrimaryColorInput').value = state.config.primaryColor || '#0f2a5c';
             document.getElementById('setPhone1').value = state.config.phone1 || '01063796906';
             document.getElementById('setPhone2').value = state.config.phone2 || '01550350419';
             document.getElementById('setPrimaryOrderPhone').value = state.config.primaryOrderPhone || 'phone1';
