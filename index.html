@@ -1231,6 +1231,22 @@
             }
         }
 
+        window.deleteOrderById = async function(orderNum) {
+            if (!confirm('متأكد إنك عايز تمسح الطلب ' + orderNum + '؟ مش هينفع ترجعه تاني.')) return;
+            try {
+                if (state.firebaseReady && state.user && db) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', String(orderNum)));
+                }
+                state.orders = (state.orders || []).filter(o => String(o.orderNum) !== String(orderNum));
+                saveLocalCache();
+                renderAdminOrders();
+                if (window.showToast) window.showToast('تم مسح الطلب');
+            } catch (e) {
+                console.error('Delete order error:', e);
+                alert('تعذر مسح الطلب. تأكد إنك مسجل دخول كأدمن وحاول تاني.');
+            }
+        };
+
         async function deleteProductFromCloud(productId) {
             saveLocalCache();
             if (state.firebaseReady && state.user && db) {
@@ -2349,6 +2365,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                            class="text-xs font-bold text-primary-700 hover:underline">
                             فتح في واتساب ↗
                         </a>
+                        <button type="button" onclick="deleteOrderById('${order.orderNum}')" class="text-xs font-bold text-red-600 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg px-2.5 py-1">🗑 مسح الطلب</button>
                     </div>
                 </div>
             `).join('');
