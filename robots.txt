@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://alameer-hypermarket.github.io/sitemap.xml
+Sitemap: https://alameer-hypermarket.netlify.app/sitemap.xml
