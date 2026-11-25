@@ -96,13 +96,6 @@
 
                 <!-- أزرار الهيدر: لوحة الإدارة + السلة -->
                 <div class="flex items-center gap-2">
-                    <button onclick="openAdminGate()" class="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold px-3.5 py-2.5 rounded-xl border border-slate-200 transition cursor-pointer text-xs sm:text-sm">
-                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                        </svg>
-                        <span>لوحة الإدارة</span>
-                    </button>
-
                     <button onclick="openCartDrawer()" class="flex items-center gap-2 bg-primary-700 hover:bg-primary-800 text-white font-bold px-3.5 sm:px-4 py-2.5 rounded-xl transition cursor-pointer">
                         <div class="relative">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2685,7 +2678,6 @@
             </div>
             <div class="flex flex-wrap items-center justify-center gap-4">
                 <span>أرقام الطلبات والتحويل: <strong id="footerPhonesDisplay" dir="ltr" class="text-slate-700">01063796906 / 01550350419</strong></span>
-                <button onclick="openAdminGate()" class="text-primary-700 hover:underline font-bold cursor-pointer">لوحة الإدارة</button>
             </div>
         </div>
     </footer>
@@ -2847,8 +2839,9 @@
             <div class="py-4 space-y-3">
                 <p class="text-xs text-slate-500">أدخل كلمة مرور الإدارة للتحكم في المنتجات والأسعار والمناطق والطلبات.</p>
                 <div>
+                    <input type="text" name="username" value="admin" autocomplete="username" readonly hidden>
                     <label class="block text-xs font-bold text-slate-700 mb-1">كلمة المرور</label>
-                    <input type="password" id="adminPassInput" onkeydown="if(event.key==='Enter') verifyAdminLogin()" placeholder="••••••" class="w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-primary-700 rounded-xl px-3.5 py-2.5 text-sm outline-none">
+                    <input type="password" name="password" autocomplete="current-password" id="adminPassInput" onkeydown="if(event.key==='Enter') verifyAdminLogin()" placeholder="••••••" class="w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-primary-700 rounded-xl px-3.5 py-2.5 text-sm outline-none">
                 </div>
                 <p id="adminLoginError" class="hidden text-xs font-bold text-rose-600">كلمة المرور غير صحيحة</p>
             </div>
@@ -4801,6 +4794,7 @@ ${itemsLines}━━━━━━━━━━━━━━
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', bootstrapApp);
+            document.addEventListener('DOMContentLoaded', function(){ if (/[?&]admin(=|&|$)/.test(location.search)) setTimeout(function(){ if (window.openAdminGate) window.openAdminGate(); }, 700); });
         } else {
             bootstrapApp();
         }
