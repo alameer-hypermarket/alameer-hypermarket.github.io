@@ -474,6 +474,9 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             <button onclick="switchAdminTab('offers')" id="adminTab-offers" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition whitespace-nowrap cursor-pointer">
                 العروض
             </button>
+            <button onclick="switchAdminTab('sales')" id="adminTab-sales" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer">
+                المبيعات
+            </button>
             <button onclick="switchAdminTab('orders')" id="adminTab-orders" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer flex items-center gap-1.5">
                 <span>سجل الطلبات</span>
                 <span id="adminOrdersCountBadge" class="bg-slate-100 text-slate-700 text-[11px] px-2 py-0.5 rounded-full">0</span>
@@ -643,6 +646,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 </div>
 
                 <!-- التبويب 4: سجل الطلبات -->
+                <div id="adminPanel-sales" class="hidden space-y-4"><div id="adminSalesBox"></div></div>
                 <div id="adminPanel-orders" class="hidden space-y-4">
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
                         <div>
@@ -1283,7 +1287,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                         saveLocalCache();
                         document.getElementById('adminOrdersCountBadge').textContent = state.orders.length;
                         if (!document.getElementById('adminDashboardModal').classList.contains('hidden')) {
-                            renderAdminOrders();
+                            renderAdminOrders(); renderSales();
                         }
                     } catch (e) {}
                 }, (err) => console.error('Orders snapshot error:', err));
@@ -2193,7 +2197,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         };
 
         window.switchAdminTab = function(tabName) {
-            ['products', 'zones', 'settings', 'offers', 'orders'].forEach(t => {
+            ['products', 'zones', 'settings', 'offers', 'sales', 'orders'].forEach(t => {
                 document.getElementById(`adminPanel-${t}`).classList.toggle('hidden', t !== tabName);
                 const btn = document.getElementById(`adminTab-${t}`);
                 if (t === tabName) {
@@ -2208,6 +2212,64 @@ ${itemsLines}━━━━━━━━━━━━━━
             if (tabName === 'zones') renderAdminZonesList();
             if (tabName === 'orders') renderAdminOrders();
             if (tabName === 'offers') renderAdminOffers();
+            if (tabName === 'sales') renderSales();
+        };
+
+
+        window.renderSales = function () {
+            const box = document.getElementById('adminSalesBox');
+            if (!box) return;
+            const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const orders = state.orders || [];
+            const nf = n => Number(n).toLocaleString('en-US');
+            const now = new Date();
+            const day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const DAY = 86400000;
+            const month0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            const sum = (from) => { let t = 0, c = 0; orders.forEach(o => { if ((o.createdAtMs || 0) >= from) { t += Number(o.total) || 0; c++; } }); return { t, c }; };
+            let revenue = 0;
+            orders.forEach(o => { revenue += Number(o.total) || 0; });
+            const avg = orders.length ? Math.round(revenue / orders.length) : 0;
+            const today = sum(day0), week = sum(day0 - 6 * DAY), month = sum(month0);
+            const card = (label, val, sub) => '<div class="bg-slate-50 rounded-xl p-2"><div class="text-[11px] text-slate-500">' + label + '</div><div class="text-base font-extrabold">' + val + '</div>' + (sub ? '<div class="text-[11px] text-slate-500">' + sub + '</div>' : '') + '</div>';
+            // chart: last 14 days
+            const days = [];
+            for (let i = 13; i >= 0; i--) {
+                const from = day0 - i * DAY;
+                let t = 0, c = 0;
+                orders.forEach(o => { const ms = o.createdAtMs || 0; if (ms >= from && ms < from + DAY) { t += Number(o.total) || 0; c++; } });
+                days.push({ from, t, c });
+            }
+            const max = Math.max.apply(null, days.map(d => d.t).concat([1]));
+            const bars = days.map(d => {
+                const h = d.t ? Math.max(4, Math.round(d.t / max * 100)) : 2;
+                const dd = new Date(d.from);
+                return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0">' +
+                    '<div style="font-size:9px;color:#64748b;height:12px;line-height:12px">' + (d.t ? nf(d.t) : '') + '</div>' +
+                    '<div title="' + d.c + ' طلب" style="width:70%;height:' + h + '%;background:rgb(var(--p700));border-radius:4px 4px 0 0;opacity:' + (d.t ? 1 : .25) + '"></div>' +
+                    '<div style="font-size:9px;color:#94a3b8;margin-top:2px">' + dd.getDate() + '/' + (dd.getMonth() + 1) + '</div></div>';
+            }).join('');
+            // top products
+            const sold = {};
+            orders.forEach(o => {
+                String(o.itemsSummary || '').split('، ').forEach(part => {
+                    const m = part.trim().match(/^(.*)\s\(×(\d+)\)$/);
+                    if (m) sold[m[1].trim()] = (sold[m[1].trim()] || 0) + Number(m[2]);
+                });
+            });
+            const ranked = Object.entries(sold).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const row = (i, n, q) => '<div class="flex justify-between text-xs py-1 border-b border-slate-100"><span>' + (i + 1) + '. ' + esc(n) + '</span><span class="font-bold text-primary-700">×' + q + '</span></div>';
+            box.innerHTML = '<div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-4">' +
+                '<h3 class="text-sm font-extrabold text-slate-900">المبيعات</h3>' +
+                '<div class="grid grid-cols-3 gap-2 text-center">' +
+                card('إجمالي المبيعات', nf(revenue) + ' ج.م') + card('عدد الطلبات', orders.length) + card('متوسط الطلب', nf(avg) + ' ج.م') + '</div>' +
+                '<div class="grid grid-cols-3 gap-2 text-center">' +
+                card('اليوم', nf(today.t) + ' ج.م', today.c + ' طلب') + card('آخر 7 أيام', nf(week.t) + ' ج.م', week.c + ' طلب') + card('هذا الشهر', nf(month.t) + ' ج.م', month.c + ' طلب') + '</div>' +
+                '<div><div class="text-xs font-bold text-slate-700 mb-2">المبيعات اليومية (آخر 14 يوم)</div>' +
+                '<div style="display:flex;align-items:stretch;gap:3px;height:150px;direction:ltr">' + bars + '</div></div>' +
+                '<div><div class="text-xs font-bold text-slate-700 mb-1">الأكثر مبيعاً</div>' +
+                (ranked.length ? ranked.map((r, i) => row(i, r[0], r[1])).join('') : '<div class="text-xs text-slate-500">لا توجد طلبات بعد</div>') + '</div>' +
+                '</div>';
         };
 
         window.renderAdminProductsTable = function() {
@@ -2637,7 +2699,7 @@ ${itemsLines}━━━━━━━━━━━━━━
 
         function renderAdminOrders() {
             const container = document.getElementById('adminOrdersList');
-            renderOrderStats();
+
             document.getElementById('adminOrdersCountBadge').textContent = state.orders.length;
 
             if (state.orders.length === 0) {
