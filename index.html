@@ -2307,6 +2307,9 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 const ov = document.createElement('div');
                 ov.className = 'fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center p-4 gap-3';
                 ov.innerHTML = '<img alt="إيصال" class="max-h-[80vh] max-w-full rounded-lg bg-white"><div class="flex gap-2"><a class="text-xs font-bold bg-white text-slate-800 rounded-lg px-3 py-1.5" download="receipt-' + String(orderNum).replace(/[^A-Za-z0-9-]/g, '') + '.jpg">تحميل</a><button type="button" class="text-xs font-bold bg-white text-slate-800 rounded-lg px-3 py-1.5">إغلاق</button></div>';
+                ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483000;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px';
+                const rimg = ov.querySelector('img'); rimg.style.cssText = 'max-height:80vh;max-width:100%;background:#fff;border-radius:8px';
+                ov.querySelectorAll('a,button').forEach(x => { x.style.cssText = 'background:#fff;color:#1e293b;font-weight:700;font-size:13px;border-radius:8px;padding:6px 12px;display:inline-block'; });
                 ov.querySelector('img').src = d;
                 ov.querySelector('a').href = d;
                 ov.querySelector('button').onclick = () => ov.remove();
