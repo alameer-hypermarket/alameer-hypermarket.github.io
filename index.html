@@ -624,10 +624,6 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 <label class="block text-xs font-bold text-slate-700 mb-1.5">اسم المتجر</label>
                                 <input type="text" id="setStoreName" class="w-full bg-slate-50 border border-slate-200 focus:border-primary-700 rounded-xl px-3.5 py-2.5 text-sm outline-none">
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1.5">كلمة مرور لوحة الإدارة الجديدة (اتركها فارغة لعدم التغيير)</label>
-                                <input type="password" autocomplete="new-password" minlength="8" id="setAdminPassword" class="w-full bg-slate-50 border border-slate-200 focus:border-primary-700 rounded-xl px-3.5 py-2.5 text-sm outline-none">
-                            </div>
                         </div>
 
                         <div class="pt-2">
@@ -635,6 +631,26 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 حفظ ومزامنة الإعدادات
                             </button>
                         </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 mt-4">
+                        <h3 class="text-base font-extrabold text-slate-900 pb-3 border-b border-slate-100">تغيير كلمة مرور لوحة الإدارة</h3>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">كلمة المرور الحالية</label>
+                            <input type="password" id="curAdminPassword" autocomplete="current-password" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none">
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">كلمة المرور الجديدة (8 أحرف على الأقل)</label>
+                                <input type="password" id="newAdminPassword" autocomplete="new-password" minlength="8" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">تأكيد كلمة المرور الجديدة</label>
+                                <input type="password" id="newAdminPassword2" autocomplete="new-password" minlength="8" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none">
+                            </div>
+                        </div>
+                        <p id="adminPassMsg" class="text-xs font-bold hidden"></p>
+                        <button onclick="changeAdminPassword()" id="changeAdminPassBtn" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer transition">تغيير كلمة المرور</button>
                     </div>
                 </div>
 
@@ -809,14 +825,14 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
     <!-- المنطق البرمجي الكامل وربط Firebase (Application Logic & Firestore)     -->
     <!-- ===================================================================== -->
     <script type="module">
-        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection;
+        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection;
         let fbLibsPromise = null;
         function loadFirebaseLibs() {
             if (!fbLibsPromise) {
                 const B = 'https://www.gstatic.com/firebasejs/11.6.1/';
                 fbLibsPromise = Promise.all([import(B + 'firebase-app.js'), import(B + 'firebase-auth.js'), import(B + 'firebase-firestore.js')]).then(function (m) {
                     ({ initializeApp } = m[0]);
-                    ({ getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword } = m[1]);
+                    ({ getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } = m[1]);
                     ({ getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection } = m[2]);
                 });
             }
@@ -2812,16 +2828,45 @@ ${itemsLines}━━━━━━━━━━━━━━
             document.getElementById('setPhone2').value = state.config.phone2 || '01550350419';
             document.getElementById('setPrimaryOrderPhone').value = state.config.primaryOrderPhone || 'phone1';
             document.getElementById('setStoreName').value = state.config.storeName;
-            document.getElementById('setAdminPassword').value = '';
-        }
+                    }
+
+        window.changeAdminPassword = async function() {
+            const cur = document.getElementById('curAdminPassword').value;
+            const nw = document.getElementById('newAdminPassword').value;
+            const nw2 = document.getElementById('newAdminPassword2').value;
+            const msg = document.getElementById('adminPassMsg');
+            const btn = document.getElementById('changeAdminPassBtn');
+            const say = (t, ok) => { msg.textContent = t; msg.className = 'text-xs font-bold ' + (ok ? 'text-emerald-600' : 'text-red-600'); };
+            if (!cur) return say('اكتب كلمة المرور الحالية', false);
+            if (nw.length < 8) return say('كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف', false);
+            if (nw !== nw2) return say('تأكيد كلمة المرور غير مطابق', false);
+            if (nw === cur) return say('الكلمة الجديدة مطابقة للحالية', false);
+            if (!auth || !auth.currentUser || !auth.currentUser.email) return say('سجّل الدخول للوحة الإدارة من جديد ثم أعد المحاولة', false);
+            btn.disabled = true;
+            try {
+                const cred = EmailAuthProvider.credential(auth.currentUser.email, cur);
+                await reauthenticateWithCredential(auth.currentUser, cred);
+                await updatePassword(auth.currentUser, nw);
+                ['curAdminPassword','newAdminPassword','newAdminPassword2'].forEach(id => document.getElementById(id).value = '');
+                say('تم تغيير كلمة المرور. استخدم الكلمة الجديدة في الدخول القادم', true);
+                showToast('تم تغيير كلمة مرور الإدارة');
+            } catch (e) {
+                const c = e && e.code || '';
+                if (c.indexOf('wrong-password') >= 0 || c.indexOf('invalid-credential') >= 0) say('كلمة المرور الحالية غير صحيحة', false);
+                else if (c.indexOf('weak-password') >= 0) say('كلمة المرور الجديدة ضعيفة، اختار أقوى', false);
+                else if (c.indexOf('too-many-requests') >= 0) say('محاولات كتير، استنى شوية وجرب تاني', false);
+                else if (c.indexOf('network') >= 0) say('مشكلة في الاتصال بالإنترنت', false);
+                else say('فشل تغيير كلمة المرور. سجّل الخروج وادخل من جديد وأعد المحاولة', false);
+            }
+            btn.disabled = false;
+        };
 
         window.saveStoreSettings = async function() {
             const p1 = document.getElementById('setPhone1').value.trim();
             const p2 = document.getElementById('setPhone2').value.trim();
             const primaryChoice = document.getElementById('setPrimaryOrderPhone').value;
             const storeName = document.getElementById('setStoreName').value.trim() || DEFAULT_CONFIG.storeName;
-            const adminPassword = document.getElementById('setAdminPassword').value.trim();
-
+            
             if (!p1 || p1.length < 10) {
                 showToast('يرجى إدخال الرقم الأول بشكل صحيح');
                 return;
@@ -2834,20 +2879,6 @@ ${itemsLines}━━━━━━━━━━━━━━
 
             await syncConfigToCloud();
             applyConfigToUI();
-            if (adminPassword) {
-                if (adminPassword.length < 8) {
-                    showToast('كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف');
-                    return;
-                }
-                try {
-                    await updatePassword(auth.currentUser, adminPassword);
-                    document.getElementById('setAdminPassword').value = '';
-                    showToast('تم حفظ الإعدادات وتغيير كلمة مرور الإدارة');
-                } catch (e) {
-                    showToast('تم حفظ الإعدادات، لكن تغيير كلمة المرور فشل. سجّل الخروج وادخل من جديد ثم أعد المحاولة');
-                }
-                return;
-            }
             showToast('تم حفظ ومزامنة الإعدادات والأرقام');
         };
 
