@@ -31,7 +31,7 @@ window.applyTheme=function(hex){
 try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');window.applyTheme(__c&&__c.primaryColor)}catch(e){window.applyTheme()}
 </script>
 <link rel="preload" href="/products.json" as="fetch" crossorigin>
-    <script>window.__pj=fetch("/products.json").then(function(r){return r.ok?r.json():null}).catch(function(){return null});</script>
+    <script>window.__pjImg={};window.__pj=fetch("/products.json",{cache:"no-cache"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null}).then(function(l){if(Array.isArray(l))l.forEach(function(p){if(p&&p.id!=null&&p.imageUrl)window.__pjImg[String(p.id)]=p.imageUrl});return l});</script>
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"GroceryStore","name":"هايبر ماركت الأمير","url":"https://alameer-hypermarket.pages.dev/","telephone":"+201063796906","priceRange":"EGP","description":"سوبر ماركت أونلاين: مواد غذائية ومنظفات ومشروبات وسناكس مع توصيل لمنطقتك.","areaServed":"EG","currenciesAccepted":"EGP"}</script>
     <meta property="og:type" content="website">
     <link rel="manifest" href="/manifest.webmanifest">
@@ -1100,6 +1100,12 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             });
 
             const merged = Array.from(existingMap.values());
+            // مصدر الصور الوحيد: products.json. أي صورة محلية (/img/) بتتثبّت منه، فمفيش نسخة قديمة أو مخزّنة تلخبط الصور
+            merged.forEach(function (p) {
+                const cur = p.imageUrl || '';
+                const ref = window.__pjImg && window.__pjImg[String(p.id)];
+                if (ref && (!cur || cur.indexOf('/img/') === 0)) p.imageUrl = ref;
+            });
             merged.sort((a, b) => Number(a.id) - Number(b.id));
             return merged.length > 0 ? merged : DEFAULT_PRODUCTS.map(p => ({ ...p }));
         }
@@ -2828,6 +2834,15 @@ ${itemsLines}━━━━━━━━━━━━━━
                     if (applyList(list)) { renderCategories(); renderProducts(); updateCartUI(); }
                 });
             }
+            window.__pj.then(function (list) {
+                if (!Array.isArray(list) || !list.length) return;
+                let ch = false;
+                state.products.forEach(function (p) {
+                    const ref = window.__pjImg[String(p.id)], cur = p.imageUrl || '';
+                    if (ref && cur !== ref && (!cur || cur.indexOf('/img/') === 0)) { p.imageUrl = ref; ch = true; }
+                });
+                if (ch) { saveLocalCache(); renderProducts(); }
+            });
             window.__pj.finally(function () { setTimeout(initFirebaseSync, 200); });
             window.__pj.finally(function () { setTimeout(function () {
                 fetch('/images.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (map) {
