@@ -372,6 +372,18 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                     </button>
                 </div>
             </div>
+                            <div id="receiptBox" class="bg-white rounded-lg border border-primary-100 p-3 space-y-2">
+                                <div class="text-xs font-bold text-slate-800">📎 إرفاق إيصال التحويل <span class="text-slate-400 font-normal">(اختياري)</span></div>
+                                <label class="inline-block text-xs font-bold bg-primary-50 hover:bg-primary-100 text-primary-700 px-3 py-1.5 rounded-md cursor-pointer">
+                                    اختار صورة الإيصال
+                                    <input type="file" id="receiptFile" accept="image/*" class="hidden" onchange="handleReceiptPick(this)">
+                                </label>
+                                <div id="receiptPreviewBox" class="hidden flex items-center gap-2">
+                                    <img id="receiptThumb" alt="الإيصال" class="w-16 h-16 object-cover rounded-lg border border-slate-200">
+                                    <button type="button" onclick="clearReceipt()" class="text-[11px] font-bold text-red-600 border border-red-200 rounded-md px-2 py-1">مسح</button>
+                                </div>
+                                <p id="receiptMsg" class="hidden text-[11px] font-bold text-rose-600"></p>
+                            </div>
                         </div>
                     </div>
 
@@ -1588,6 +1600,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             try {
                 if (state.firebaseReady && state.user && db) {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', String(orderNum)));
+                    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', 'RCPT-' + String(orderNum))); } catch (e) {}
                 }
                 state.orders = (state.orders || []).filter(o => String(o.orderNum) !== String(orderNum));
                 saveLocalCache();
@@ -2117,6 +2130,64 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             updateCartUI();
         };
 
+        window.__receiptData = '';
+        window.clearReceipt = function() {
+            window.__receiptData = '';
+            const f = document.getElementById('receiptFile'); if (f) f.value = '';
+            const b = document.getElementById('receiptPreviewBox'); if (b) b.classList.add('hidden');
+            const m = document.getElementById('receiptMsg'); if (m) m.classList.add('hidden');
+        };
+        window.handleReceiptPick = function(input) {
+            const msg = document.getElementById('receiptMsg');
+            const fail = (t) => { msg.textContent = t; msg.classList.remove('hidden'); window.__receiptData = ''; document.getElementById('receiptPreviewBox').classList.add('hidden'); };
+            msg.classList.add('hidden');
+            const file = input.files && input.files[0];
+            if (!file) return;
+            if (!/^image\//.test(file.type)) { fail('اختار صورة فقط.'); return; }
+            if (file.size > 15 * 1024 * 1024) { fail('الصورة كبيرة قوي، اختار صورة أصغر.'); return; }
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = function() {
+                try {
+                    let w = img.naturalWidth, h = img.naturalHeight;
+                    let scale = Math.min(1, 1000 / Math.max(w, h));
+                    let data = '';
+                    for (let attempt = 0; attempt < 5; attempt++) {
+                        const c = document.createElement('canvas');
+                        c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
+                        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+                        ctx.drawImage(img, 0, 0, c.width, c.height);
+                        data = c.toDataURL('image/jpeg', 0.7);
+                        if (data.length < 180000) break;
+                        scale *= 0.75;
+                    }
+                    URL.revokeObjectURL(url);
+                    if (data.length > 400000) { fail('تعذر تصغير الصورة، جرّب صورة تانية.'); return; }
+                    window.__receiptData = data;
+                    document.getElementById('receiptThumb').src = data;
+                    document.getElementById('receiptPreviewBox').classList.remove('hidden');
+                } catch (e) { fail('تعذر قراءة الصورة، جرّب صورة تانية.'); }
+            };
+            img.onerror = function() { URL.revokeObjectURL(url); fail('تعذر قراءة الصورة، جرّب صورة تانية.'); };
+            img.src = url;
+        };
+        window.showOrderReceipt = async function(orderNum) {
+            try {
+                const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', 'RCPT-' + String(orderNum)));
+                if (!snap.exists() || !snap.data().img) { alert('الإيصال مش موجود.'); return; }
+                const d = snap.data().img;
+                if (!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(d)) { alert('ملف الإيصال غير صالح.'); return; }
+                const ov = document.createElement('div');
+                ov.className = 'fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center p-4 gap-3';
+                ov.innerHTML = '<img alt="إيصال" class="max-h-[80vh] max-w-full rounded-lg bg-white"><div class="flex gap-2"><a class="text-xs font-bold bg-white text-slate-800 rounded-lg px-3 py-1.5" download="receipt-' + String(orderNum).replace(/[^A-Za-z0-9-]/g, '') + '.jpg">تحميل</a><button type="button" class="text-xs font-bold bg-white text-slate-800 rounded-lg px-3 py-1.5">إغلاق</button></div>';
+                ov.querySelector('img').src = d;
+                ov.querySelector('a').href = d;
+                ov.querySelector('button').onclick = () => ov.remove();
+                ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+                document.body.appendChild(ov);
+            } catch (e) { console.error(e); alert('تعذر تحميل الإيصال.'); }
+        };
+
         window.handlePaymentMethodChange = function() {
             const selected = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'cash';
             const box = document.getElementById('transferNumbersBox');
@@ -2130,6 +2201,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 title.textContent = 'حوّل إجمالي الفاتورة عبر إنستاباي (InstaPay) على أحد الأرقام التالية:';
             } else {
                 box.classList.add('hidden');
+                if (window.clearReceipt) window.clearReceipt();
             }
         };
 
@@ -2294,7 +2366,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
 *الاسم:* ${name}
 *الموبايل:* ${phone}
 *العنوان والدور:* ${address}
-${landmarkLine}${notesLine}*وسيلة الدفع:* ${payLabels[payMethod]}
+${landmarkLine}${notesLine}*وسيلة الدفع:* ${payLabels[payMethod]}${(window.__receiptData && (payMethod === 'wallet' || payMethod === 'instapay')) ? '\n*إيصال التحويل:* مرفق على الموقع (شوفه من الأدمن)' : ''}
 ━━━━━━━━━━━━━━
 *الأصناف المطلوبة:*
 ${itemsLines}━━━━━━━━━━━━━━
@@ -2304,6 +2376,7 @@ ${itemsLines}━━━━━━━━━━━━━━
 
             state.lastGeneratedReceipt = messageText;
 
+            const receiptImg = (payMethod === 'wallet' || payMethod === 'instapay') ? (window.__receiptData || '') : '';
             const newOrder = {
                 orderNum,
                 customerName: name,
@@ -2321,11 +2394,17 @@ ${itemsLines}━━━━━━━━━━━━━━
                 status: 'جديد',
                 date: new Date().toLocaleString('ar-EG'),
                 createdAtMs: Date.now(),
+                hasReceipt: !!receiptImg,
                 messageText
             };
 
             state.orders.unshift(newOrder);
             await syncOrderToCloud(newOrder);
+            if (receiptImg && state.firebaseReady && state.user && db) {
+                try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', 'RCPT-' + orderNum), { orderNum, img: receiptImg, kind: 'receipt' }); }
+                catch (e) { console.error('receipt save error', e); }
+            }
+            if (receiptImg) window.clearReceipt();
             notifyTelegram('order', { text: messageText });
 
             const { primary, secondary } = getPrimaryAndSecondaryPhones();
@@ -2990,7 +3069,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                         '<div class="flex flex-wrap justify-between gap-2"><span><b class="text-primary-700">#' + archEsc(o.orderNum || d.id) + '</b> ' + archEsc(o.customerName) + ' <span dir="ltr">(' + archEsc(o.customerPhone) + ')</span></span><b>' + archEsc(o.total) + ' ج.م</b></div>' +
                         '<div class="text-slate-600">' + archEsc(o.address) + '</div>' +
                         '<div class="text-slate-500">' + archEsc(o.itemsSummary) + '</div>' +
-                        '<div class="text-[11px] text-slate-400">' + archEsc(o.date) + ' — ' + archEsc(o.status || '') + '</div></div>';
+                        '<div class="text-[11px] text-slate-400">' + archEsc(o.date) + ' — ' + archEsc(o.status || '') + '</div>' + (o.hasReceipt ? '<button type="button" onclick="showOrderReceipt(\'' + archEsc(o.orderNum || d.id) + '\')" class="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5">🧾 عرض الإيصال</button>' : '') + '</div>';
                     ARCH.cursor = d;
                 });
                 list.insertAdjacentHTML('beforeend', html);
@@ -3108,6 +3187,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                             <span class="font-bold text-slate-900 text-sm">${order.customerName}</span>
                             <span class="text-slate-500" dir="ltr">(${order.customerPhone})</span>
                             <span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">${order.paymentMethod || 'كاش'}</span>
+                            ${order.hasReceipt ? `<button type="button" onclick="showOrderReceipt('${order.orderNum}')" class="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5">🧾 عرض الإيصال</button>` : ''}
                         </div>
                         <p class="text-slate-700">${order.zoneName ? '<strong>المنطقة:</strong> ' + order.zoneName + ' — ' : ''}<strong>العنوان:</strong> ${order.address}</p>
                         ${order.landmark ? `<p class="text-slate-600"><strong>علامة مميزة:</strong> ${order.landmark}</p>` : ''}
