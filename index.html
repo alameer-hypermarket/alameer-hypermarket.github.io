@@ -1703,18 +1703,23 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             let blob;
             try { blob = await invRender(order); } catch (e) { alert('تعذر إنشاء صورة الفاتورة.'); return; }
             const file = new File([blob], 'فاتورة-' + order.orderNum + '.png', { type: 'image/png' });
+            // الجديد: نسخ صورة الفاتورة + فتح شات العميل مباشرة (wa.me مبيقدرش يحمل صورة)
+            let ph = String(order.customerPhone || '').replace(/[^0-9]/g, '').replace(/^00/, '');
+            if (/^01[0125][0-9]{8}$/.test(ph)) ph = '2' + ph;
+            const waUrl = 'https://wa.me/' + ph + '?text=' + encodeURIComponent(caption);
+            let copied = false;
             try {
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({ files: [file], text: caption });
-                    return;
+                if (navigator.clipboard && window.ClipboardItem) {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    copied = true;
                 }
-            } catch (e) { if (e && e.name === 'AbortError') return; }
-            // بديل (كمبيوتر): نسخ العنوان + تنزيل الصورة + فتح واتساب بالنص
-            try { await navigator.clipboard.writeText(caption); } catch (e) {}
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
-            window.open('https://wa.me/' + formatEgyptWhatsApp(order.customerPhone) + '?text=' + encodeURIComponent(caption), '_blank');
-            if (window.showToast) window.showToast('اتنزلت صورة الفاتورة، ارفقها في الواتساب (النص جاهز)');
+            } catch (e) {}
+            if (!copied) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+            }
+            if (window.showToast) window.showToast(copied ? 'الفاتورة اتنسخت: اضغط لصق في الشات' : 'اتنزلت صورة الفاتورة، ارفقها في الشات');
+            setTimeout(() => { window.location.href = waUrl; }, 400);
         };
 
         window.deleteOrderById = async function(orderNum) {
