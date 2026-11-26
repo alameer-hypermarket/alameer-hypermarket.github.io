@@ -1104,7 +1104,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             merged.forEach(function (p) {
                 const cur = p.imageUrl || '';
                 const ref = window.__pjImg && window.__pjImg[String(p.id)];
-                if (ref && (!cur || cur.indexOf('/img/') === 0)) p.imageUrl = ref;
+                if (ref && (!cur || cur.indexOf('/img/') === 0 || cur.indexOf('openfoodfacts') >= 0)) p.imageUrl = ref;
             });
             merged.sort((a, b) => Number(a.id) - Number(b.id));
             return merged.length > 0 ? merged : DEFAULT_PRODUCTS.map(p => ({ ...p }));
@@ -1199,7 +1199,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 const configDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main');
                 window.__fb = { auth, db, doc, collection, setDoc, getDoc, onSnapshot, configDocRef };
 
-                onSnapshot(configDocRef, (snap) => {
+                const __cfgHandler = (snap) => {
                     try {
                         if (snap.exists()) {
                             const data = snap.data();
@@ -1219,7 +1219,9 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                             }
                         }
                     } catch (e) {}
-                }, (err) => console.error('Config snapshot error:', err));
+                };
+                window.__applyCfgSnap = __cfgHandler;
+                window.__cfgDocRef = configDocRef;
 
                 // 2. مزامنة المنتجات
                 const productsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
@@ -1272,12 +1274,12 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 let productsLive = false;
                 let productsSyncing = false;
                 window.__startProductsLive = function () {
-                    if (productsLive || !db) return;
+                    return;
                     productsLive = true;
                     onSnapshot(productsColRef, handleProductsSnapshot, (err) => console.error('Products snapshot error:', err));
                 };
                 window.__syncProductsOnce = async function (stamp) {
-                    if (state.isAdmin || productsLive || productsSyncing || !stamp || !db) return;
+                    return;
                     let last = 0;
                     try { last = Number(localStorage.getItem('al_ameer_psync')) || 0; } catch (e) {}
                     if (!last) last = PRODUCTS_JSON_BASE;
@@ -1352,6 +1354,68 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
         }
 
+
+        // ===== الكتالوج المنشور: وثيقة واحدة بدل 509 قراءة. الأدمن بينشرها، والزبائن بيقروها من /api/catalog (مخزّن على Cloudflare) =====
+        let __pubT = null;
+        function schedulePublish() { clearTimeout(__pubT); __pubT = setTimeout(publishCatalog, 2500); }
+        async function publishCatalog() {
+            if (!(state.isAdmin && db && state.user)) return false;
+            try {
+                const cfg = { ...state.config }; delete cfg.adminPassword; delete cfg.productsUpdatedAt;
+                const payload = { products: state.products, config: cfg };
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'catalog'), { json: JSON.stringify(payload), updatedAt: Date.now() });
+                return true;
+            } catch (e) { console.error('Publish catalog error:', e); return false; }
+        }
+        window.__publishCatalog = publishCatalog;
+
+        function applyCatalog(d) {
+            if (!d || !Array.isArray(d.products) || d.products.length === 0) return false;
+            state.products = mergeProductsSafely(d.products);
+            if (d.config && typeof d.config === 'object') {
+                const cfg = d.config;
+                state.config = { ...DEFAULT_CONFIG, ...cfg, zones: Array.isArray(cfg.zones) && cfg.zones.length > 0 ? cfg.zones : DEFAULT_CONFIG.zones };
+                delete state.config.adminPassword;
+            }
+            saveLocalCache();
+            try { applyConfigToUI(); } catch (e) {}
+            renderCategories();
+            renderProducts();
+            updateCartUI();
+            return true;
+        }
+
+        let __catLoading = false;
+        let __catLast = 0;
+        async function loadCatalogForVisitors() {
+            if (state.isAdmin || __catLoading) return;
+            __catLoading = true;
+            try {
+                const r = await fetch('/api/catalog');
+                if (r.ok) { applyCatalog(await r.json()); __catLast = Date.now(); }
+            } catch (e) {} finally { __catLoading = false; }
+        }
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible' && Date.now() - __catLast > 300000) loadCatalogForVisitors();
+        });
+
+        async function loadAdminData() {
+            try {
+                if (!db) return;
+                const cs = await getDoc(window.__cfgDocRef);
+                if (cs.exists() && window.__applyCfgSnap) window.__applyCfgSnap(cs);
+                const ks = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'catalog'));
+                if (ks.exists()) {
+                    const d = JSON.parse(ks.data().json || '{}');
+                    if (Array.isArray(d.products) && d.products.length) {
+                        state.products = mergeProductsSafely(d.products);
+                        saveLocalCache(); renderCategories(); renderProducts(); updateCartUI();
+                        if (!document.getElementById('adminDashboardModal').classList.contains('hidden')) renderAdminProductsTable();
+                    }
+                }
+            } catch (e) { console.error('Admin load error:', e); }
+        }
+
         async function stampProductsUpdated() {
             try {
                 const t = Date.now();
@@ -1364,9 +1428,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             saveLocalCache();
             if (state.firebaseReady && state.user && db) {
                 try {
-                    const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', String(product.id));
-                    await setDoc(pRef, product);
-                    await stampProductsUpdated();
+                    schedulePublish();
                 } catch (e) {
                     console.error('Sync product error:', e);
                 }
@@ -1412,9 +1474,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             saveLocalCache();
             if (state.firebaseReady && state.user && db) {
                 try {
-                    const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', String(productId));
-                    await deleteDoc(pRef);
-                    await stampProductsUpdated();
+                    schedulePublish();
                 } catch (e) {
                     console.error('Delete product error:', e);
                 }
@@ -1426,7 +1486,9 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             if (state.firebaseReady && state.user && db) {
                 try {
                     const cRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main');
-                    await setDoc(cRef, state.config);
+                    const __c = { ...state.config }; delete __c.adminPassword;
+                    await setDoc(cRef, __c);
+                    schedulePublish();
                 } catch (e) {
                     console.error('Sync config error:', e);
                 }
@@ -2189,8 +2251,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                 closeAdminLoginModal();
                 openAdminDashboard();
                 subscribeOrdersForAdmin();
-                if (window.__startProductsLive) window.__startProductsLive();
-                seedCloudIfEmpty();
+                loadAdminData();
             } catch (e) {
                 document.getElementById('adminLoginError').classList.remove('hidden');
             }
@@ -2839,11 +2900,12 @@ ${itemsLines}━━━━━━━━━━━━━━
                 let ch = false;
                 state.products.forEach(function (p) {
                     const ref = window.__pjImg[String(p.id)], cur = p.imageUrl || '';
-                    if (ref && cur !== ref && (!cur || cur.indexOf('/img/') === 0)) { p.imageUrl = ref; ch = true; }
+                    if (ref && cur !== ref && (!cur || cur.indexOf('/img/') === 0 || cur.indexOf('openfoodfacts') >= 0)) { p.imageUrl = ref; ch = true; }
                 });
                 if (ch) { saveLocalCache(); renderProducts(); }
             });
             window.__pj.finally(function () { setTimeout(initFirebaseSync, 200); });
+            window.__pj.finally(function () { setTimeout(loadCatalogForVisitors, 50); });
             window.__pj.finally(function () { setTimeout(function () {
                 fetch('/images.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (map) {
                     if (!map) return;
