@@ -1390,6 +1390,14 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
         }
 
+        // الزبون العادي مش محتاج Firebase: الكتالوج والإعدادات بييجوا من /api/catalog المخزّن على Cloudflare.
+        // Firebase بيشتغل بس للأدمن أو لحظة إرسال الطلب، عشان آلاف الزيارات المتزامنة ما تستهلكش حصة Firestore المجانية.
+        window.__ensureFb = function () {
+            if (state.firebaseReady && db && state.user) return Promise.resolve(true);
+            if (!window.__fbInitP) window.__fbInitP = initFirebaseSync().catch(function (e) { console.error(e); });
+            return window.__fbInitP.then(function () { return !!(state.firebaseReady && db && state.user); });
+        };
+
         let ordersSubscribed = false;
         function subscribeOrdersForAdmin() {
             if (ordersSubscribed || !db) return;
@@ -2497,6 +2505,7 @@ ${itemsLines}━━━━━━━━━━━━━━
             };
 
             state.orders.unshift(newOrder);
+            try { await Promise.race([window.__ensureFb(), new Promise(function (r) { setTimeout(r, 8000); })]); } catch (e) {}
             await syncOrderToCloud(newOrder);
             if (receiptImg && state.firebaseReady && state.user && db) {
                 try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', 'RCPT-' + orderNum), { orderNum, img: receiptImg, kind: 'receipt' }); }
@@ -2554,6 +2563,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         // لوحة تحكم الأدمن (Admin Dashboard - كلمة المرور:)
         // =====================================================================
         window.openAdminGate = function() {
+            try { window.__ensureFb(); } catch (e) {}
             document.getElementById('adminPassInput').value = '';
             document.getElementById('adminLoginError').classList.add('hidden');
             document.getElementById('adminLoginModal').classList.remove('hidden');
@@ -2565,6 +2575,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         };
 
         window.verifyAdminLogin = async function() {
+            try { await window.__ensureFb(); } catch (e) {}
             try { await loadFirebaseLibs(); } catch (e) {}
             const entered = document.getElementById('adminPassInput').value.trim();
             try {
@@ -3359,7 +3370,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                 });
                 if (ch) { saveLocalCache(); renderProducts(); }
             });
-            window.__pj.finally(function () { setTimeout(initFirebaseSync, 200); });
+            window.__pj.finally(function () { setTimeout(function () { if (/[?&]admin(=|&|$)/.test(location.search)) window.__ensureFb(); }, 200); });
             window.__pj.finally(function () { setTimeout(loadCatalogForVisitors, 50); });
             window.__pj.finally(function () { setTimeout(function () {
                 fetch('/images.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (map) {
