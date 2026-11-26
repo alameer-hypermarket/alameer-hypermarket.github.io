@@ -1595,6 +1595,104 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             if (window.showToast) window.showToast('تم تحديد التوصيل وتحديث الإجمالي');
         };
 
+        // ---- فاتورة كصورة مطبوعة + العنوان كنص مرفق (مشاركة للواتساب) ----
+        function invParseItems(order) {
+            const items = [];
+            String(order.messageText || '').split('\n').forEach(line => {
+                const m = line.match(/^\s*\d+\.\s+(.+?)\s+×\s+(\d+)\s+=\s+\*?(\d+(?:\.\d+)?)/);
+                if (m) items.push({ name: m[1], qty: Number(m[2]), total: Number(m[3]) });
+            });
+            if (!items.length) String(order.itemsSummary || '').split('، ').forEach(p => {
+                const m = p.match(/^(.+?)\s*\(×(\d+)\)$/);
+                if (m) items.push({ name: m[1], qty: Number(m[2]), total: null });
+            });
+            return items;
+        }
+        function invCaption(order) {
+            return 'أهلاً ' + order.customerName + '، فاتورة طلبك #' + order.orderNum +
+                '\nالإجمالي: ' + order.total + ' ج.م' +
+                '\nالعنوان: ' + order.address +
+                (order.landmark ? '\nعلامة مميزة: ' + order.landmark : '');
+        }
+        async function invRender(order) {
+            try { await Promise.race([document.fonts.load('700 24px Cairo'), new Promise(r => setTimeout(r, 1500))]); } catch (e) {}
+            const items = invParseItems(order);
+            const W = 560, S = 2, pad = 28, rowH = 34;
+            const H = 330 + items.length * rowH + 230;
+            const cv = document.createElement('canvas');
+            cv.width = W * S; cv.height = H * S;
+            const c = cv.getContext('2d');
+            c.scale(S, S);
+            c.fillStyle = '#ffffff'; c.fillRect(0, 0, W, H);
+            c.fillStyle = '#fbfaf6'; c.fillRect(10, 0, W - 20, H);
+            c.direction = 'rtl';
+            const ff = 'Cairo, Tahoma, Arial, sans-serif';
+            const ink = '#1f1f1f';
+            let y = 44;
+            const txt = (t, x, yy, size, weight, align, color) => {
+                c.font = (weight || 400) + ' ' + size + 'px ' + ff;
+                c.textAlign = align || 'right'; c.fillStyle = color || ink;
+                c.fillText(String(t), x, yy);
+            };
+            const dash = yy => { c.save(); c.strokeStyle = '#555'; c.setLineDash([6, 5]); c.lineWidth = 1.2; c.beginPath(); c.moveTo(pad, yy); c.lineTo(W - pad, yy); c.stroke(); c.restore(); };
+            const R = W - pad, L = pad;
+            txt((state.config && state.config.storeName) || 'هايبر ماركت الأمير', W / 2, y, 28, 800, 'center'); y += 30;
+            txt('فاتورة طلب', W / 2, y, 16, 600, 'center', '#444'); y += 18;
+            dash(y); y += 28;
+            txt('رقم الطلب: #' + order.orderNum, R, y, 17, 700, 'right'); y += 28;
+            txt('التاريخ: ' + (order.date || ''), R, y, 15, 400, 'right', '#333'); y += 28;
+            txt('العميل: ' + order.customerName, R, y, 15, 400, 'right', '#333'); y += 28;
+            txt('الدفع: ' + (order.paymentMethod || 'كاش'), R, y, 15, 400, 'right', '#333'); y += 14;
+            dash(y); y += 26;
+            txt('الصنف', R, y, 14, 700, 'right', '#444');
+            txt('الكمية', W * 0.40, y, 14, 700, 'center', '#444');
+            txt('السعر', L, y, 14, 700, 'left', '#444'); y += 12;
+            dash(y); y += 26;
+            items.forEach(it => {
+                let name = it.name;
+                c.font = '400 15px ' + ff;
+                while (c.measureText(name).width > W * 0.52 && name.length > 4) name = name.slice(0, -2);
+                if (name !== it.name) name += '…';
+                txt(name, R, y, 15, 400, 'right');
+                txt(it.qty, W * 0.40, y, 15, 400, 'center');
+                txt(it.total == null ? '' : it.total + ' ج.م', L, y, 15, 400, 'left');
+                y += rowH;
+            });
+            y -= 10; dash(y); y += 28;
+            const feeTxt = order.deliveryPending ? 'يتحدد' : (Number(order.deliveryFee) === 0 ? 'مجاني' : order.deliveryFee + ' ج.م');
+            txt('قيمة المنتجات', R, y, 15, 400, 'right'); txt(order.subtotal + ' ج.م', L, y, 15, 400, 'left'); y += 28;
+            txt('التوصيل', R, y, 15, 400, 'right'); txt(feeTxt, L, y, 15, 400, 'left'); y += 14;
+            dash(y); y += 36;
+            txt('الإجمالي', R, y, 22, 800, 'right'); txt(order.total + ' ج.م', L, y, 22, 800, 'left'); y += 16;
+            dash(y); y += 34;
+            txt('شكراً لتعاملكم معنا', W / 2, y, 16, 600, 'center'); y += 6;
+            const out = document.createElement('canvas');
+            out.width = W * S; out.height = Math.ceil((y + 24) * S);
+            const oc = out.getContext('2d');
+            oc.drawImage(cv, 0, 0);
+            return await new Promise(res => out.toBlob(res, 'image/png'));
+        }
+        window.shareOrderInvoice = async function(orderNum) {
+            const order = (state.orders || []).find(o => String(o.orderNum) === String(orderNum));
+            if (!order) return;
+            const caption = invCaption(order);
+            let blob;
+            try { blob = await invRender(order); } catch (e) { alert('تعذر إنشاء صورة الفاتورة.'); return; }
+            const file = new File([blob], 'فاتورة-' + order.orderNum + '.png', { type: 'image/png' });
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], text: caption });
+                    return;
+                }
+            } catch (e) { if (e && e.name === 'AbortError') return; }
+            // بديل (كمبيوتر): نسخ العنوان + تنزيل الصورة + فتح واتساب بالنص
+            try { await navigator.clipboard.writeText(caption); } catch (e) {}
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+            window.open('https://wa.me/' + formatEgyptWhatsApp(order.customerPhone) + '?text=' + encodeURIComponent(caption), '_blank');
+            if (window.showToast) window.showToast('اتنزلت صورة الفاتورة، ارفقها في الواتساب (النص جاهز)');
+        };
+
         window.deleteOrderById = async function(orderNum) {
             if (!confirm('متأكد إنك عايز تمسح الطلب ' + orderNum + '؟ مش هينفع ترجعه تاني.')) return;
             try {
@@ -3203,6 +3301,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                             <button type="button" onclick="setOrderDelivery('${order.orderNum}')" class="text-xs font-bold text-white bg-primary-700 rounded-lg px-2.5 py-1">تأكيد</button>
                         </div>
                         ${order.deliveryPending ? '' : `<a href="https://wa.me/${formatEgyptWhatsApp(order.customerPhone)}?text=${encodeURIComponent(order.customerMessage || '')}" target="_blank" rel="noopener noreferrer" class="text-xs font-bold text-green-700 hover:underline">إرسال الإجمالي للعميل ↗</a>`}
+                        ${order.deliveryPending ? '' : `<button type="button" onclick="shareOrderInvoice('${order.orderNum}')" class="text-xs font-bold text-white bg-green-700 rounded-lg px-2.5 py-1">🧾 فاتورة صورة + العنوان للواتساب</button>`}
                         <a href="https://wa.me/${formatEgyptWhatsApp(primary)}?text=${encodeURIComponent(order.messageText)}"
                            target="_blank" rel="noopener noreferrer"
                            class="text-xs font-bold text-primary-700 hover:underline">
