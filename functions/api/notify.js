@@ -66,13 +66,19 @@ export async function onRequestPost({ request, env }) {
   if (b.type === 'order') {
     const text = String(b.text || '').replace(/\*/g, '').slice(0, 3500);
     if (text.length < 20) return json({ ok: false, error: 'empty' }, 400);
-    // Spam guard: at most 8 order notifications per 10 minutes per IP (orders are still saved; only the Telegram ping is skipped).
+    // Spam guard: at most 8 order notifications per 10 minutes per IP, and about 50 per 10 minutes across everyone,
+    // so a burst or load test cannot flood the owner's Telegram. Orders are still saved; only the Telegram ping is skipped.
     try {
       const ip = request.headers.get('cf-connecting-ip') || 'x';
+      const gk = new Request('https://cache.internal/rl-all');
+      const gh = await caches.default.match(gk);
+      const g = gh ? (parseInt(await gh.text(), 10) || 0) : 0;
+      if (g >= 50) return json({ ok: false, error: 'rate_limited' }, 429);
       const ck = new Request('https://cache.internal/rl/' + encodeURIComponent(ip));
       const hit = await caches.default.match(ck);
       const n = hit ? (parseInt(await hit.text(), 10) || 0) : 0;
       if (n >= 8) return json({ ok: false, error: 'rate_limited' }, 429);
+      await caches.default.put(gk, new Response(String(g + 1), { headers: { 'cache-control': 'max-age=600' } }));
       await caches.default.put(ck, new Response(String(n + 1), { headers: { 'cache-control': 'max-age=600' } }));
     } catch (e) {}
     const chat = await configChatId(env);
