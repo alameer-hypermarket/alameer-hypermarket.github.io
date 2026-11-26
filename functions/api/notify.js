@@ -66,6 +66,15 @@ export async function onRequestPost({ request, env }) {
   if (b.type === 'order') {
     const text = String(b.text || '').replace(/\*/g, '').slice(0, 3500);
     if (text.length < 20) return json({ ok: false, error: 'empty' }, 400);
+    // Spam guard: at most 8 order notifications per 10 minutes per IP (orders are still saved; only the Telegram ping is skipped).
+    try {
+      const ip = request.headers.get('cf-connecting-ip') || 'x';
+      const ck = new Request('https://cache.internal/rl/' + encodeURIComponent(ip));
+      const hit = await caches.default.match(ck);
+      const n = hit ? (parseInt(await hit.text(), 10) || 0) : 0;
+      if (n >= 8) return json({ ok: false, error: 'rate_limited' }, 429);
+      await caches.default.put(ck, new Response(String(n + 1), { headers: { 'cache-control': 'max-age=600' } }));
+    } catch (e) {}
     const chat = await configChatId(env);
     if (!chat) return json({ ok: false, error: 'no_chat' }, 200);
     const res = await tgSend(env, { chat_id: chat, text: '🛒 ' + text });
