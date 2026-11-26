@@ -498,6 +498,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                             <button onclick="openProductFormModal()" class="whitespace-nowrap flex-1 sm:flex-initial bg-primary-700 hover:bg-primary-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm cursor-pointer">
                                 + إضافة منتج جديد
                             </button>
+                            <button onclick="openCategoriesManager()" class="whitespace-nowrap flex-1 sm:flex-initial bg-white border border-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm cursor-pointer">🗂️ إدارة الأقسام</button>
                             <button id="refreshImagesBtn" onclick="fetchMissingPackagingImages(true)" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3.5 py-2.5 rounded-xl text-xs cursor-pointer">
                                 تحديث الصور تلقائياً
                             </button>
@@ -873,6 +874,35 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             { id: 'beverages', name: 'مشروبات وعصائر', icon: '🥤', bg: '#dbeafe' },
             { id: 'detergents', name: 'منظفات وعناية', icon: '🧴', bg: '#ede9fe' }
         ];
+
+        // ===== أقسام قابلة للتعديل من الأدمن (محفوظة في config.categories وبتتنشر للزباين مع الكتالوج) =====
+        function refreshCategoryControls() {
+            try {
+                const f = document.getElementById('adminCategoryFilter');
+                const pSel = document.getElementById('prodCategoryInput');
+                const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+                if (f) {
+                    const v = f.value;
+                    f.innerHTML = '<option value="all">جميع الأقسام</option>' + CATEGORIES.filter(c => c.id !== 'all').map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('');
+                    f.value = CATEGORIES.some(c => c.id === v) || v === 'all' ? v : 'all';
+                }
+                if (pSel) {
+                    const v = pSel.value;
+                    pSel.innerHTML = CATEGORIES.filter(c => c.id !== 'all').map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('');
+                    if (CATEGORIES.some(c => c.id === v)) pSel.value = v;
+                }
+            } catch (e) {}
+        }
+        function applyCategories(list) {
+            if (!Array.isArray(list) || list.length === 0) return;
+            const arr = [{ id: 'all', name: 'الكل', icon: '🛒', bg: '#dbe5fa' }];
+            list.forEach(function (c) {
+                if (c && c.id != null && String(c.id) !== 'all') arr.push({ id: String(c.id), name: String(c.name || c.id), icon: c.icon || '🏷️', bg: c.bg || '#e2e8f0' });
+            });
+            CATEGORIES.length = 0;
+            arr.forEach(function (c) { CATEGORIES.push(c); });
+            refreshCategoryControls();
+        }
 
         // كتالوج المنتجات الكامل (63 منتجاً بأسعار السوق المصري الفعلية وبيانات العبوة)
         const DEFAULT_PRODUCTS = [
@@ -1416,6 +1446,62 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             } catch (e) { console.error('Admin load error:', e); }
         }
 
+
+        // ===== إدارة الأقسام (إضافة / تعديل / حذف قسم فاضي) =====
+        window.openCategoriesManager = function () {
+            if (!state.isAdmin) return;
+            const old = document.getElementById('catMgrModal'); if (old) old.remove();
+            const esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+            const rows = CATEGORIES.filter(c => c.id !== 'all').map(function (c) {
+                const cnt = state.products.filter(p => p.category === c.id).length;
+                return { id: c.id, name: c.name, icon: c.icon, bg: c.bg, cnt: cnt };
+            });
+            const wrap = document.createElement('div');
+            wrap.id = 'catMgrModal';
+            wrap.style.cssText = 'position:fixed;inset:0;z-index:90;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px';
+            wrap.innerHTML = '<div style="background:#fff;border-radius:18px;max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;direction:rtl">' +
+                '<div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">إدارة الأقسام</b><button id="catMgrClose" style="font-size:20px;cursor:pointer">✕</button></div>' +
+                '<div id="catMgrRows" style="padding:12px 18px;overflow:auto;flex:1"></div>' +
+                '<div style="padding:12px 18px;border-top:1px solid #e2e8f0;display:flex;gap:8px;flex-wrap:wrap"><button id="catMgrAdd" style="border:1px solid #cbd5e1;border-radius:12px;padding:8px 14px;font-weight:700;cursor:pointer">+ قسم جديد</button><button id="catMgrSave" style="background:#0f3b8c;color:#fff;border-radius:12px;padding:8px 18px;font-weight:700;cursor:pointer;margin-inline-start:auto">حفظ</button></div>' +
+                '<div style="padding:0 18px 12px;font-size:11px;color:#64748b">تعديل الاسم أو الأيقونة بيتطبق على كل منتجات القسم تلقائيًا. القسم اللي فيه منتجات مينفعش يتمسح (انقل منتجاته الأول).</div></div>';
+            document.body.appendChild(wrap);
+            const box = wrap.querySelector('#catMgrRows');
+            function draw() {
+                box.innerHTML = '';
+                rows.forEach(function (r, i) {
+                    const d = document.createElement('div');
+                    d.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
+                    d.innerHTML = '<input data-k="icon" value="' + esc(r.icon) + '" style="width:48px;text-align:center;border:1px solid #e2e8f0;border-radius:10px;padding:6px;font-size:18px">' +
+                        '<input data-k="name" value="' + esc(r.name) + '" style="flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:8px;font-weight:700">' +
+                        '<input data-k="bg" type="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(r.bg) ? r.bg : '#e2e8f0') + '" style="width:38px;height:36px;border:none;background:none">' +
+                        '<span style="font-size:11px;color:#64748b;width:54px;text-align:center">' + r.cnt + ' منتج</span>' +
+                        '<button data-del="1" style="color:' + (r.cnt ? '#cbd5e1' : '#e11d48') + ';font-weight:700;cursor:pointer">حذف</button>';
+                    d.querySelectorAll('input').forEach(function (inp) { inp.oninput = function () { r[inp.getAttribute('data-k')] = inp.value; }; });
+                    d.querySelector('[data-del]').onclick = function () {
+                        if (r.cnt > 0) { alert('القسم ده فيه ' + r.cnt + ' منتج. انقلهم لقسم تاني الأول وبعدين امسحه.'); return; }
+                        rows.splice(i, 1); draw();
+                    };
+                    box.appendChild(d);
+                });
+            }
+            draw();
+            wrap.querySelector('#catMgrClose').onclick = function () { wrap.remove(); };
+            wrap.querySelector('#catMgrAdd').onclick = function () {
+                rows.push({ id: 'c' + Date.now().toString(36), name: 'قسم جديد', icon: '🏷️', bg: '#e2e8f0', cnt: 0 }); draw();
+            };
+            wrap.querySelector('#catMgrSave').onclick = async function () {
+                const out = rows.map(function (r) { return { id: r.id, name: (r.name || '').trim() || 'قسم', icon: (r.icon || '').trim() || '🏷️', bg: r.bg || '#e2e8f0' }; });
+                if (out.length === 0) { alert('لازم يفضل قسم واحد على الأقل.'); return; }
+                state.config.categories = out;
+                applyCategories(out);
+                renderCategories(); renderProducts();
+                if (!document.getElementById('adminDashboardModal').classList.contains('hidden')) renderAdminProductsTable();
+                await syncConfigToCloud();
+                wrap.remove();
+                if (window.showToast) window.showToast('تم حفظ الأقسام وهتظهر للزباين خلال دقائق');
+            };
+        };
+
         async function stampProductsUpdated() {
             try {
                 const t = Date.now();
@@ -1676,6 +1762,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
         window.addEventListener('resize', syncHeaderHeight);
 
         function applyConfigToUI() {
+            try { if (state.config && Array.isArray(state.config.categories)) { applyCategories(state.config.categories); if (typeof renderCategories === 'function' && Array.isArray(state.products) && state.products.length) renderCategories(); } } catch (e) {}
             const { primary, p1, p2 } = getPrimaryAndSecondaryPhones();
             document.getElementById('headerStoreName').textContent = state.config.storeName;
             if (window.applyTheme) applyTheme(state.config.primaryColor);
@@ -2355,16 +2442,7 @@ ${itemsLines}━━━━━━━━━━━━━━
             const catFilter = document.getElementById('adminCategoryFilter').value;
             const tbody = document.getElementById('adminProductsTableBody');
 
-            const catNames = {
-                groceries: 'مواد غذائية',
-                snacks: 'شيبسي وسناكس',
-                beverages: 'مشروبات وعصائر',
-                dairy: 'ألبان وبيض',
-                frozen: 'مجمدات',
-                baby: 'أطفال',
-                baking: 'مستحضرات الكيك والحلويات',
-                detergents: 'منظفات وعناية'
-            };
+            const catNames = {}; CATEGORIES.forEach(function (c) { catNames[c.id] = c.name; });
 
             const list = state.products.filter(p => {
                 const matchCat = catFilter === 'all' || p.category === catFilter;
