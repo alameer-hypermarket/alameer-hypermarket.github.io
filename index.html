@@ -849,14 +849,13 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
         let db = null;
         let auth = null;
 
-        // الإعدادات الافتراضية شاملة الأرقام والمناطق وكلمة المرور
+        // الإعدادات الافتراضية شاملة الأرقام والمناطق
         const DEFAULT_CONFIG = {
             storeName: 'هايبر ماركت الأمير',
             phone1: '01063796906',
             phone2: '01550350419',
             primaryOrderPhone: 'phone1',
             freeDeliveryThreshold: 600,
-            adminPassword: '',
             zones: [
                 { id: 'z1', name: 'وسط البلد', fee: 15 },
                 { id: 'z2', name: 'مناطق قريبة', fee: 20 },
@@ -1126,16 +1125,12 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 const rawC = localStorage.getItem(LOCAL_KEYS.CONFIG);
                 const parsedC = rawC ? JSON.parse(rawC) : null;
                 if (parsedC && typeof parsedC === 'object') {
-                    const resolvedPass = (!parsedC.adminPassword || parsedC.adminPassword === '1234')
-                        ? ''
-                        : parsedC.adminPassword;
-
                     state.config = {
                         ...DEFAULT_CONFIG,
                         ...parsedC,
-                        adminPassword: resolvedPass,
                         zones: Array.isArray(parsedC.zones) && parsedC.zones.length > 0 ? parsedC.zones : DEFAULT_CONFIG.zones
                     };
+                    delete state.config.adminPassword;
                 }
             } catch (e) {
                 state.config = { ...DEFAULT_CONFIG };
@@ -1205,16 +1200,12 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                     try {
                         if (snap.exists()) {
                             const data = snap.data();
-                            const resolvedPass = (!data.adminPassword || data.adminPassword === '1234')
-                                ? ''
-                                : data.adminPassword;
-
                             state.config = {
                                 ...DEFAULT_CONFIG,
                                 ...data,
-                                adminPassword: resolvedPass,
                                 zones: Array.isArray(data.zones) && data.zones.length > 0 ? data.zones : DEFAULT_CONFIG.zones
                             };
+                            delete state.config.adminPassword;
                             saveLocalCache();
                             try { if (window.__syncProductsOnce) window.__syncProductsOnce(Number(data.productsUpdatedAt) || 0); } catch (e) {}
                             applyConfigToUI();
@@ -1336,8 +1327,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             try {
                 const configSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'));
                 if (!configSnap.exists()) {
-                    const cfg = { ...state.config, adminPassword: '' };
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), cfg);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), state.config);
                 }
                 for (const p of state.products) {
                     const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', String(p.id));
@@ -2723,7 +2713,6 @@ ${itemsLines}━━━━━━━━━━━━━━
             state.config.phone2 = p2;
             state.config.primaryOrderPhone = primaryChoice;
             state.config.storeName = storeName;
-            state.config.adminPassword = '';
 
             await syncConfigToCloud();
             applyConfigToUI();
