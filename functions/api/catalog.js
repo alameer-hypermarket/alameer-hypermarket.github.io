@@ -4,7 +4,7 @@
 const API_KEY = 'AIzaSyCDj7uwEHPtw-PtOayhSPdpcaGyZpJHcJ4';
 const URL_ = 'https://firestore.googleapis.com/v1/projects/alameer-hypermarket-store/databases/(default)/documents/artifacts/al-ameer-hypermarket/public/data/config/catalog?key=' + API_KEY;
 const TTL = 300;
-const H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=120, s-maxage=' + TTL };
+const H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300, stale-while-revalidate=600, s-maxage=' + TTL };
 
 export async function onRequestGet(context) {
   const cache = caches.default;

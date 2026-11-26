@@ -16,13 +16,22 @@ async function lookup(idToken) {
 }
 
 async function configChatId(env) {
+  const cache = caches.default;
+  const ck = new Request('https://cache.internal/tg-chat-id');
+  try {
+    const hit = await cache.match(ck);
+    if (hit) { const v = (await hit.text()).trim(); if (v) return v; }
+  } catch (e) {}
   try {
     const u = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/artifacts/al-ameer-hypermarket/public/data/config/main?key=${API_KEY}`;
     const r = await fetch(u);
     if (r.ok) {
       const d = await r.json();
       const v = d.fields && d.fields.telegramChatId && d.fields.telegramChatId.stringValue;
-      if (v) return v.trim();
+      if (v) {
+        try { await cache.put(ck, new Response(v.trim(), { headers: { 'cache-control': 'max-age=300' } })); } catch (e) {}
+        return v.trim();
+      }
     }
   } catch (e) {}
   return (env.TELEGRAM_CHAT_ID || '').trim();
@@ -33,6 +42,17 @@ async function tg(env, method, body) {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {})
   });
   return r.json().catch(() => ({ ok: false }));
+}
+
+// Telegram allows ~1 message/second per chat; on a burst it answers 429 with retry_after. Wait and retry once.
+async function tgSend(env, body) {
+  let res = await tg(env, 'sendMessage', body);
+  if (!res.ok && res.error_code === 429) {
+    const wait = Math.min(Number(res.parameters && res.parameters.retry_after) || 1, 5);
+    await new Promise(r => setTimeout(r, wait * 1000));
+    res = await tg(env, 'sendMessage', body);
+  }
+  return res;
 }
 
 export async function onRequestPost({ request, env }) {
@@ -48,7 +68,7 @@ export async function onRequestPost({ request, env }) {
     if (text.length < 20) return json({ ok: false, error: 'empty' }, 400);
     const chat = await configChatId(env);
     if (!chat) return json({ ok: false, error: 'no_chat' }, 200);
-    const res = await tg(env, 'sendMessage', { chat_id: chat, text: '🛒 ' + text });
+    const res = await tgSend(env, { chat_id: chat, text: '🛒 ' + text });
     return json({ ok: !!res.ok });
   }
   if (!isAdmin) return json({ ok: false, error: 'forbidden' }, 403);
