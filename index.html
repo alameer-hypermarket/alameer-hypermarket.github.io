@@ -2304,6 +2304,21 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             img.onerror = function() { URL.revokeObjectURL(url); fail('تعذر قراءة الصورة، جرّب صورة تانية.'); };
             img.src = url;
         };
+        window.__rcptCache = window.__rcptCache || {};
+        window.loadRcptThumb = async function(img) {
+            if (img.dataset.done) return;
+            img.dataset.done = '1';
+            const n = img.dataset.rcpt;
+            try {
+                let d = window.__rcptCache[n];
+                if (!d) {
+                    const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', 'RCPT-' + String(n)));
+                    d = snap.exists() ? (snap.data().img || '') : '';
+                    if (d) window.__rcptCache[n] = d;
+                }
+                if (/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(d)) img.src = d;
+            } catch (e) { console.error(e); }
+        };
         window.showOrderReceipt = async function(orderNum) {
             try {
                 const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', 'RCPT-' + String(orderNum)));
@@ -3328,6 +3343,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                             <span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">${order.paymentMethod || 'كاش'}</span>
                             ${order.hasReceipt ? `<button type="button" onclick="showOrderReceipt('${order.orderNum}')" class="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5">🧾 عرض الإيصال</button>` : ''}
                         </div>
+                        ${order.hasReceipt ? `<div style="margin-top:8px;padding:8px;border:1px solid #a7f3d0;background:#ecfdf5;border-radius:10px;display:flex;gap:10px;align-items:center"><img data-rcpt="${order.orderNum}" onload="loadRcptThumb(this)" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" onclick="showOrderReceipt('${order.orderNum}')" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer"><div style="font-size:12px;font-weight:700;color:#047857">🧾 إيصال التحويل مرفق مع الطلب (${order.paymentMethod})<br><span style="font-weight:400;color:#334155">اضغط على الصورة للتكبير</span></div></div>` : ''}
                         <p class="text-slate-700">${order.zoneName ? '<strong>المنطقة:</strong> ' + order.zoneName + ' — ' : ''}<strong>العنوان:</strong> ${order.address}</p>
                         ${order.landmark ? `<p class="text-slate-600"><strong>علامة مميزة:</strong> ${order.landmark}</p>` : ''}
                         ${order.notes ? `<p class="text-amber-700 bg-amber-50 rounded px-2 py-1"><strong>ملاحظات:</strong> ${order.notes}</p>` : ''}
