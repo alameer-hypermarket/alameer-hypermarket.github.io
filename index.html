@@ -1273,8 +1273,10 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 auth = getAuth(app);
                 try { db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }); } catch (e) { db = getFirestore(app); }
 
-                const cred = await signInAnonymously(auth);
-                state.user = cred.user;
+                try { if (auth.authStateReady) await auth.authStateReady(); } catch (e) {}
+                const __cu = auth.currentUser;
+                if (__cu && !__cu.isAnonymous && __cu.email === ADMIN_EMAIL) { state.user = __cu; state.isAdmin = true; }
+                else { const cred = await signInAnonymously(auth); state.user = cred.user; }
 
                 if (!state.user) return;
                 state.firebaseReady = true;
@@ -2607,7 +2609,12 @@ ${itemsLines}━━━━━━━━━━━━━━
         // =====================================================================
         // لوحة تحكم الأدمن (Admin Dashboard - كلمة المرور:)
         // =====================================================================
-        window.openAdminGate = function() {
+        window.openAdminGate = async function() {
+            if (localStorage.getItem('al_ameer_adm') === '1') {
+                try { await window.__ensureFb(); } catch (e) {}
+                if (state.isAdmin && auth && auth.currentUser && !auth.currentUser.isAnonymous) { openAdminDashboard(); subscribeOrdersForAdmin(); loadAdminData(); return; }
+                try { localStorage.removeItem('al_ameer_adm'); } catch (e) {}
+            }
             try { window.__ensureFb(); } catch (e) {}
             document.getElementById('adminPassInput').value = '';
             document.getElementById('adminLoginError').classList.add('hidden');
@@ -2628,6 +2635,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                 const cred = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, entered);
                 state.user = cred.user;
                 state.isAdmin = true;
+                try { localStorage.setItem('al_ameer_adm', '1'); } catch (e) {}
                 closeAdminLoginModal();
                 openAdminDashboard();
                 subscribeOrdersForAdmin();
@@ -3452,7 +3460,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         } else {
             bootstrapApp();
         }
-        if (/[?&]admin(=|&|$)/.test(location.search)) { setTimeout(function(){ if (window.openAdminGate) window.openAdminGate(); }, 1200); }
+        if (/[?&]admin(=|&|$)/.test(location.search)) { setTimeout(function(){ if (window.openAdminGate) window.openAdminGate(); }, 50); }
     </script>
 
     <div id="productModal" class="hidden fixed inset-0 z-50">
