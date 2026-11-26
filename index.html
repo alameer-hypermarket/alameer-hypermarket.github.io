@@ -825,7 +825,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
     <!-- المنطق البرمجي الكامل وربط Firebase (Application Logic & Firestore)     -->
     <!-- ===================================================================== -->
     <script type="module">
-        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection;
+        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit;
         let fbLibsPromise = null;
         function loadFirebaseLibs() {
             if (!fbLibsPromise) {
@@ -833,7 +833,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 fbLibsPromise = Promise.all([import(B + 'firebase-app.js'), import(B + 'firebase-auth.js'), import(B + 'firebase-firestore.js')]).then(function (m) {
                     ({ initializeApp } = m[0]);
                     ({ getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } = m[1]);
-                    ({ getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection } = m[2]);
+                    ({ getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit } = m[2]);
                 });
             }
             return fbLibsPromise;
@@ -1357,7 +1357,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             ordersSubscribed = true;
                 // 3. مزامنة سجل الطلبات
                 const ordersColRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-                onSnapshot(ordersColRef, (snapshot) => {
+                onSnapshot(query(ordersColRef, orderBy('createdAtMs', 'desc'), limit(300)), (snapshot) => {
                     try {
                         const cloudOrders = [];
                         snapshot.forEach((docSnap) => {
@@ -2216,7 +2216,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
             errorEl.classList.add('hidden');
 
-            const orderNum = 'AM-' + Math.floor(1000 + Math.random() * 9000);
+            const orderNum = 'AM-' + Date.now().toString(36).slice(-5).toUpperCase() + Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0');
             const entries = Object.entries(state.cart);
             let subtotal = 0;
             let itemsLines = '';
