@@ -683,7 +683,15 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
 <div id="archiveWeek"></div>
 <div id="archiveList" class="space-y-2"></div>
 <button type="button" id="archiveMoreBtn" onclick="archiveMore()" class="hidden w-full text-xs font-bold border border-slate-200 rounded-lg py-2">تحميل ٥٠ طلب كمان</button>
-</div></div>
+</div>
+<details id="adminProofBox" class="px-1"><summary class="text-[11px] text-slate-400 cursor-pointer select-none">كشف المبيعات (للتوثيق)</summary>
+<div class="bg-white p-3 rounded-xl border border-slate-100 space-y-2 mt-2">
+<div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-500"><span>من</span><input type="date" id="proofFrom" class="border border-slate-200 rounded-lg px-2 py-1 text-xs"><span>إلى</span><input type="date" id="proofTo" class="border border-slate-200 rounded-lg px-2 py-1 text-xs">
+<button type="button" onclick="proofLoad()" class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1">عرض</button>
+<button type="button" onclick="proofCsv()" class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1">تحميل CSV</button>
+<button type="button" onclick="window.print()" class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1">طباعة</button></div>
+<div id="proofOut" class="text-[11px] text-slate-600"></div></div></details>
+</div>
                 <div id="adminPanel-orders" class="hidden space-y-4">
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
                         <div>
@@ -3006,6 +3014,38 @@ ${itemsLines}━━━━━━━━━━━━━━
                 }
                 box.innerHTML = rows;
             } catch (e) { console.error(e); box.textContent = 'تعذر التحميل.'; }
+        };
+
+        // ===== كشف المبيعات (توثيق): إجمالي كل يوم بالتجميع، بحد أقصى ٩٣ يوم =====
+        let PROOF_ROWS = [];
+        window.proofLoad = async function () {
+            const out = document.getElementById('proofOut');
+            if (!db || !state.isAdmin) { out.textContent = 'لازم تكون مسجل دخول كأدمن.'; return; }
+            const f = document.getElementById('proofFrom').value, t = document.getElementById('proofTo').value;
+            if (!f || !t) { out.textContent = 'اختار تاريخ البداية والنهاية.'; return; }
+            const a = f.split('-').map(Number), b = t.split('-').map(Number);
+            const days = Math.round((new Date(b[0], b[1] - 1, b[2]) - new Date(a[0], a[1] - 1, a[2])) / 86400000) + 1;
+            if (days < 1 || days > 93) { out.textContent = 'المدة لازم تكون من يوم لـ ٩٣ يوم.'; return; }
+            out.textContent = 'جاري التحميل...';
+            try {
+                PROOF_ROWS = []; let tc = 0, tt = 0, rows = '';
+                for (let i = 0; i < days; i++) {
+                    const d = new Date(a[0], a[1] - 1, a[2] + i);
+                    const r = archDayRange(archFmt(d));
+                    const g = await archAgg(r[0], r[1]);
+                    PROOF_ROWS.push([archFmt(d), g.c, g.t]); tc += g.c; tt += g.t;
+                    if (g.c) rows += '<tr><td class="py-0.5">' + archFmt(d) + '</td><td>' + g.c + '</td><td>' + Number(g.t).toLocaleString('en-US') + '</td></tr>';
+                }
+                out.innerHTML = '<div class="mb-1">الفترة: ' + f + ' إلى ' + t + ' — عدد الطلبات: <b>' + tc + '</b> — إجمالي المبيعات: <b>' + Number(tt).toLocaleString('en-US') + ' ج.م</b></div>' +
+                    '<table class="w-full text-right"><thead><tr class="text-slate-400"><th>اليوم</th><th>الطلبات</th><th>الإجمالي (ج.م)</th></tr></thead><tbody>' + (rows || '<tr><td colspan="3">مفيش طلبات في الفترة دي.</td></tr>') + '</tbody></table>' +
+                    '<div class="mt-1 text-slate-400">أُنشئ من سجل الطلبات المحفوظ على قاعدة البيانات في ' + new Date().toLocaleString('en-GB') + '</div>';
+            } catch (e) { console.error(e); out.textContent = 'تعذر التحميل.'; }
+        };
+        window.proofCsv = function () {
+            if (!PROOF_ROWS.length) { alert('اضغط عرض الأول.'); return; }
+            const csv = '\ufeffdate,orders,total_egp\n' + PROOF_ROWS.map(r => r.join(',')).join('\n');
+            const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+            l.download = 'sales-' + PROOF_ROWS[0][0] + '_' + PROOF_ROWS[PROOF_ROWS.length - 1][0] + '.csv'; l.click();
         };
         (function () { const t = setInterval(() => { const el = document.getElementById('archiveDate'); if (el) { clearInterval(t); el.value = archFmt(new Date()); } }, 500); })();
 
