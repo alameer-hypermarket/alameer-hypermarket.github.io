@@ -1647,7 +1647,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 it.lines = lines; it.nameSize = size;
             });
             const itemsH = items.reduce((sum, it) => sum + it.lines.length * lineH + rowPad, 0);
-            const H = 330 + itemsH + 230;
+            const isTr = /محفظ|انستا|إنستا|instapay/i.test(String(order.paymentMethod || '')); const trH = isTr ? 100 : 0; const H = 330 + itemsH + 230 + trH;
             const cv = document.createElement('canvas');
             cv.width = W * S; cv.height = H * S;
             const c = cv.getContext('2d');
@@ -1683,6 +1683,12 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 y += it.lines.length * lineH + rowPad;
             });
             y -= 10; dash(y); y += 28;
+            if (isTr) {
+                txt('إيصال التحويل', R, y, 16, 700, 'right'); y += 26;
+                txt('الدفع عن طريق: ' + order.paymentMethod, R, y, 14, 400, 'right', '#333'); y += 24;
+                txt(order.hasReceipt ? 'صورة إيصال التحويل مرفقة مع الطلب على الموقع' : 'إيصال التحويل: لم يتم رفعه', R, y, 14, 400, 'right', '#333'); y += 14;
+                dash(y); y += 28;
+            }
             const feeTxt = order.deliveryPending ? 'يتحدد' : (Number(order.deliveryFee) === 0 ? 'مجاني' : order.deliveryFee + ' ج.م');
             txt('قيمة المنتجات', R, y, 15, 400, 'right'); txt(order.subtotal + ' ج.م', L, y, 15, 400, 'left'); y += 28;
             txt('التوصيل', R, y, 15, 400, 'right'); txt(feeTxt, L, y, 15, 400, 'left'); y += 14;
