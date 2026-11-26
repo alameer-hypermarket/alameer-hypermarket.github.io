@@ -2856,7 +2856,23 @@ ${itemsLines}━━━━━━━━━━━━━━
             }, 1500); });
         }
 
-        if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); }); }
+        // تحديث تلقائي للزوار: أي نسخة جديدة من الموقع بتتفعل لوحدها والصفحة بتعمل reload مرة واحدة، من غير ما الزائر يعمل أي حاجة
+        if ('serviceWorker' in navigator) {
+            var __hadSw = !!navigator.serviceWorker.controller, __swReloading = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+                if (!__hadSw || __swReloading) return;
+                __swReloading = true;
+                location.reload();
+            });
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').then(function (reg) {
+                    reg.update().catch(function () {});
+                    document.addEventListener('visibilitychange', function () {
+                        if (document.visibilityState === 'visible') reg.update().catch(function () {});
+                    });
+                }).catch(function () {});
+            });
+        }
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', bootstrapApp);
         } else {
