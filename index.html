@@ -811,7 +811,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
     <!-- المنطق البرمجي الكامل وربط Firebase (Application Logic & Firestore)     -->
     <!-- ===================================================================== -->
     <script type="module">
-        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection;
+        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection;
         let fbLibsPromise = null;
         function loadFirebaseLibs() {
             if (!fbLibsPromise) {
@@ -819,7 +819,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 fbLibsPromise = Promise.all([import(B + 'firebase-app.js'), import(B + 'firebase-auth.js'), import(B + 'firebase-firestore.js')]).then(function (m) {
                     ({ initializeApp } = m[0]);
                     ({ getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword } = m[1]);
-                    ({ getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } = m[2]);
+                    ({ getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection } = m[2]);
                 });
             }
             return fbLibsPromise;
@@ -842,6 +842,8 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             messagingSenderId: "408464636561",
             appId: "1:408464636561:web:b22ac60627008067f89d30"
         };
+        // وقت آخر مزامنة بين products.json وقاعدة البيانات (أي تعديل بعده بيتقرأ من Firestore مرة واحدة)
+        const PRODUCTS_JSON_BASE = 1795652974345;
         const ADMIN_EMAIL = 'admin@alameer-hypermarket.app';
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'al-ameer-hypermarket';
         let db = null;
@@ -1214,6 +1216,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 zones: Array.isArray(data.zones) && data.zones.length > 0 ? data.zones : DEFAULT_CONFIG.zones
                             };
                             saveLocalCache();
+                            try { if (window.__syncProductsOnce) window.__syncProductsOnce(Number(data.productsUpdatedAt) || 0); } catch (e) {}
                             applyConfigToUI();
                             updateCartUI();
                             if (!document.getElementById('adminDashboardModal').classList.contains('hidden')) {
@@ -1228,7 +1231,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 const productsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
                 let initialSeedChecked = false;
 
-                onSnapshot(productsColRef, async (snapshot) => {
+                const handleProductsSnapshot = async (snapshot) => {
                     try {
                         const cloudProducts = [];
                         snapshot.forEach((docSnap) => {
@@ -1269,7 +1272,34 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                     } catch (e) {
                         console.error('Products merge error:', e);
                     }
-                }, (err) => console.error('Products snapshot error:', err));
+                };
+
+                // لتقليل القراءات: الزبون لا يستمع لكل المنتجات. بنقرأ المنتجات مرة واحدة بس لما الأدمن يغيّر حاجة (productsUpdatedAt في الإعدادات).
+                let productsLive = false;
+                let productsSyncing = false;
+                window.__startProductsLive = function () {
+                    if (productsLive || !db) return;
+                    productsLive = true;
+                    onSnapshot(productsColRef, handleProductsSnapshot, (err) => console.error('Products snapshot error:', err));
+                };
+                window.__syncProductsOnce = async function (stamp) {
+                    if (state.isAdmin || productsLive || productsSyncing || !stamp || !db) return;
+                    let last = 0;
+                    try { last = Number(localStorage.getItem('al_ameer_psync')) || 0; } catch (e) {}
+                    if (!last) last = PRODUCTS_JSON_BASE;
+                    if (stamp <= last) return;
+                    productsSyncing = true;
+                    try {
+                        const snap = await getDocs(productsColRef);
+                        await handleProductsSnapshot(snap);
+                        try { localStorage.setItem('al_ameer_psync', String(stamp)); } catch (e) {}
+                    } catch (e) {
+                        console.error('Products sync error:', e);
+                    } finally {
+                        productsSyncing = false;
+                    }
+                };
+                if (state.isAdmin) window.__startProductsLive();
 
             } catch (err) {
                 console.error('Firebase init fallback:', err);
@@ -1328,12 +1358,21 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
         }
 
+        async function stampProductsUpdated() {
+            try {
+                const t = Date.now();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), { productsUpdatedAt: t }, { merge: true });
+                state.config.productsUpdatedAt = t;
+            } catch (e) { console.error('Stamp error:', e); }
+        }
+
         async function syncProductToCloud(product) {
             saveLocalCache();
             if (state.firebaseReady && state.user && db) {
                 try {
                     const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', String(product.id));
                     await setDoc(pRef, product);
+                    await stampProductsUpdated();
                 } catch (e) {
                     console.error('Sync product error:', e);
                 }
@@ -1362,6 +1401,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 try {
                     const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', String(productId));
                     await deleteDoc(pRef);
+                    await stampProductsUpdated();
                 } catch (e) {
                     console.error('Delete product error:', e);
                 }
@@ -2179,6 +2219,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                 closeAdminLoginModal();
                 openAdminDashboard();
                 subscribeOrdersForAdmin();
+                if (window.__startProductsLive) window.__startProductsLive();
                 seedCloudIfEmpty();
             } catch (e) {
                 document.getElementById('adminLoginError').classList.remove('hidden');
@@ -2795,6 +2836,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         // =====================================================================
         async function bootstrapApp() {
             const hadCache = !!localStorage.getItem(LOCAL_KEYS.PRODUCTS);
+            const hadSync = !!localStorage.getItem('al_ameer_psync');
             loadInitialStateSynchronously();
             applyConfigToUI();
             const applyList = function (list) {
@@ -2811,7 +2853,7 @@ ${itemsLines}━━━━━━━━━━━━━━
             renderCategories();
             renderProducts();
             updateCartUI();
-            if (!applied) {
+            if (!applied && !hadSync) {
                 window.__pj.then(function (list) {
                     if (applyList(list)) { renderCategories(); renderProducts(); updateCartUI(); }
                 });
