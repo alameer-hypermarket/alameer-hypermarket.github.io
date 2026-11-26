@@ -1291,6 +1291,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                     productsSyncing = true;
                     try {
                         const snap = await getDocs(productsColRef);
+                        window.__psyncReads = (window.__psyncReads || 0) + snap.size;
                         await handleProductsSnapshot(snap);
                         try { localStorage.setItem('al_ameer_psync', String(stamp)); } catch (e) {}
                     } catch (e) {
@@ -2842,6 +2843,7 @@ ${itemsLines}━━━━━━━━━━━━━━
             const applyList = function (list) {
                 if (!Array.isArray(list) || !list.length) return false;
                 state.products = mergeProductsSafely(list);
+                saveLocalCache();
                 return true;
             };
             let applied = false;
