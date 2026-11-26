@@ -316,6 +316,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                             <input type="text" id="custLandmark" placeholder="بجوار مسجد / صيدلية / مدرسة..." class="w-full bg-white border border-slate-200 focus:border-primary-700 rounded-lg px-3 py-2 text-sm outline-none">
                         </div>
 
+<div style="position:absolute;left:-9999px;height:0;overflow:hidden" aria-hidden="true"><input type="text" id="custWebsite" tabindex="-1" autocomplete="off"></div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات على الطلب (اختياري)</label>
                             <textarea id="custNotes" rows="2" maxlength="500" placeholder="اكتب أي ملاحظة تحب توصلنا مع الطلب..." class="w-full bg-white border border-slate-200 focus:border-primary-700 rounded-lg px-3 py-2 text-sm outline-none resize-none"></textarea>
@@ -668,7 +669,21 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 </div>
 
                 <!-- التبويب 4: سجل الطلبات -->
-                <div id="adminPanel-sales" class="hidden space-y-4"><div id="adminSalesBox"></div></div>
+                <div id="adminPanel-sales" class="hidden space-y-4"><div id="adminSalesBox"></div>
+<div id="adminArchiveBox" class="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+<h3 class="text-sm font-extrabold text-slate-900">أرشيف الطلبات (حسب اليوم)</h3>
+<div class="flex flex-wrap items-center gap-2">
+<button type="button" onclick="archiveShift(-1)" class="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5">اليوم السابق ▶</button>
+<input type="date" id="archiveDate" onchange="archiveLoad()" class="border border-slate-200 rounded-lg px-2 py-1 text-xs">
+<button type="button" onclick="archiveShift(1)" class="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5">◀ اليوم التالي</button>
+<button type="button" onclick="archiveToday()" class="text-xs font-bold text-white bg-primary-700 rounded-lg px-2.5 py-1.5">النهارده</button>
+<button type="button" onclick="archiveWeek()" class="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5">آخر ٧ أيام</button>
+</div>
+<div id="archiveSummary" class="text-xs text-slate-600"></div>
+<div id="archiveWeek"></div>
+<div id="archiveList" class="space-y-2"></div>
+<button type="button" id="archiveMoreBtn" onclick="archiveMore()" class="hidden w-full text-xs font-bold border border-slate-200 rounded-lg py-2">تحميل ٥٠ طلب كمان</button>
+</div></div>
                 <div id="adminPanel-orders" class="hidden space-y-4">
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
                         <div>
@@ -825,7 +840,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
     <!-- المنطق البرمجي الكامل وربط Firebase (Application Logic & Firestore)     -->
     <!-- ===================================================================== -->
     <script type="module">
-        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit;
+        let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, where, startAfter, getAggregateFromServer, sum, count;
         let fbLibsPromise = null;
         function loadFirebaseLibs() {
             if (!fbLibsPromise) {
@@ -833,7 +848,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 fbLibsPromise = Promise.all([import(B + 'firebase-app.js'), import(B + 'firebase-auth.js'), import(B + 'firebase-firestore.js')]).then(function (m) {
                     ({ initializeApp } = m[0]);
                     ({ getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } = m[1]);
-                    ({ getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit } = m[2]);
+                    ({ getFirestore, initializeFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, limit, where, startAfter, getAggregateFromServer, sum, count } = m[2]);
                 });
             }
             return fbLibsPromise;
@@ -2216,6 +2231,23 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
             errorEl.classList.add('hidden');
 
+            // حماية من الأوردرات المزيفة المتكررة (على مستوى الجهاز)
+            if ((document.getElementById('custWebsite') || {}).value) return; // خانة مخفية للبوتات
+            if (window.__orderBusy) return;
+            const spamFail = (m) => { errorEl.textContent = m; errorEl.classList.remove('hidden'); };
+            const nowMs = Date.now();
+            let olog = [];
+            try { olog = JSON.parse(localStorage.getItem('am_order_log') || '[]').filter(x => nowMs - x.t < 3600000); } catch (e) {}
+            const cartSig = JSON.stringify(Object.entries(state.cart).sort());
+            const digits = phone.replace(/\D/g, '');
+            if (olog.some(x => nowMs - x.t < 20000)) { spamFail('استنى لحظات قبل ما تبعت طلب تاني.'); return; }
+            if (olog.some(x => x.p === digits && x.c === cartSig && nowMs - x.t < 600000)) { spamFail('الطلب ده اتبعت من شوية. لو محتاج تعدله كلمنا على الواتساب.'); return; }
+            if (olog.filter(x => nowMs - x.t < 1800000).length >= 3) { spamFail('بعتّ طلبات كتير في وقت قصير. حاول بعد شوية أو كلمنا على الواتساب.'); return; }
+            if (/^(\d)\1{7,}$/.test(digits)) { spamFail('يرجى إدخال رقم موبايل صحيح.'); return; }
+            window.__orderBusy = true; setTimeout(() => { window.__orderBusy = false; }, 5000);
+            olog.push({ t: nowMs, p: digits, c: cartSig });
+            try { localStorage.setItem('am_order_log', JSON.stringify(olog)); } catch (e) {}
+
             const orderNum = 'AM-' + Date.now().toString(36).slice(-5).toUpperCase() + Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0');
             const entries = Object.entries(state.cart);
             let subtotal = 0;
@@ -2393,7 +2425,7 @@ ${itemsLines}━━━━━━━━━━━━━━
             if (tabName === 'zones') renderAdminZonesList();
             if (tabName === 'orders') renderAdminOrders();
             if (tabName === 'offers') renderAdminOffers();
-            if (tabName === 'sales') renderSales();
+            if (tabName === 'sales') { renderSales(); if (window.archiveLoad && !ARCH.start) archiveLoad(); }
         };
 
 
@@ -2881,6 +2913,90 @@ ${itemsLines}━━━━━━━━━━━━━━
             applyConfigToUI();
             showToast('تم حفظ ومزامنة الإعدادات والأرقام');
         };
+
+        // ===== أرشيف الطلبات: قراءة يوم واحد فقط، ٥٠ طلب في المرة، والإجماليات بالتجميع (قراءة واحدة لكل ١٠٠٠ طلب) =====
+        const ARCH = { cursor: null, loaded: 0, start: 0, end: 0, busy: false };
+        const archEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        function archDayRange(v) {
+            const p = String(v).split('-').map(Number);
+            const a = new Date(p[0], p[1] - 1, p[2]).getTime();
+            const b = new Date(p[0], p[1] - 1, p[2] + 1).getTime();
+            return [a, b];
+        }
+        function archFmt(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        function archColl() { return collection(db, 'artifacts', appId, 'public', 'data', 'orders'); }
+        async function archAgg(a, b) {
+            const q = query(archColl(), where('createdAtMs', '>=', a), where('createdAtMs', '<', b));
+            const r = await getAggregateFromServer(q, { c: count(), t: sum('total') });
+            const d = r.data();
+            return { c: d.c || 0, t: d.t || 0 };
+        }
+        window.archiveToday = function () { document.getElementById('archiveDate').value = archFmt(new Date()); archiveLoad(); };
+        window.archiveShift = function (n) {
+            const el = document.getElementById('archiveDate');
+            const p = (el.value || archFmt(new Date())).split('-').map(Number);
+            el.value = archFmt(new Date(p[0], p[1] - 1, p[2] + n));
+            archiveLoad();
+        };
+        window.archiveLoad = async function () {
+            const el = document.getElementById('archiveDate');
+            if (!el.value) el.value = archFmt(new Date());
+            if (!db || !state.isAdmin) { document.getElementById('archiveSummary').textContent = 'لازم تكون مسجل دخول كأدمن.'; return; }
+            const r = archDayRange(el.value);
+            ARCH.start = r[0]; ARCH.end = r[1]; ARCH.cursor = null; ARCH.loaded = 0;
+            document.getElementById('archiveList').innerHTML = '';
+            document.getElementById('archiveWeek').innerHTML = '';
+            document.getElementById('archiveMoreBtn').classList.add('hidden');
+            const sm = document.getElementById('archiveSummary');
+            sm.textContent = 'جاري التحميل...';
+            try {
+                const g = await archAgg(r[0], r[1]);
+                const avg = g.c ? Math.round(g.t / g.c) : 0;
+                sm.innerHTML = 'طلبات اليوم: <b>' + g.c + '</b> — إجمالي المبيعات: <b>' + Number(g.t).toLocaleString('en-US') + ' ج.م</b> — متوسط الطلب: <b>' + avg + ' ج.م</b>';
+                await archiveMore();
+            } catch (e) { console.error(e); sm.textContent = 'تعذر التحميل. جرّب تاني.'; }
+        };
+        window.archiveMore = async function () {
+            if (ARCH.busy) return; ARCH.busy = true;
+            try {
+                const parts = [archColl(), where('createdAtMs', '>=', ARCH.start), where('createdAtMs', '<', ARCH.end), orderBy('createdAtMs', 'desc')];
+                if (ARCH.cursor) parts.push(startAfter(ARCH.cursor));
+                parts.push(limit(50));
+                const snap = await getDocs(query.apply(null, parts));
+                const list = document.getElementById('archiveList');
+                let html = '';
+                snap.forEach(d => {
+                    const o = d.data();
+                    html += '<div class="border border-slate-200 rounded-xl p-3 text-xs space-y-0.5">' +
+                        '<div class="flex flex-wrap justify-between gap-2"><span><b class="text-primary-700">#' + archEsc(o.orderNum || d.id) + '</b> ' + archEsc(o.customerName) + ' <span dir="ltr">(' + archEsc(o.customerPhone) + ')</span></span><b>' + archEsc(o.total) + ' ج.م</b></div>' +
+                        '<div class="text-slate-600">' + archEsc(o.address) + '</div>' +
+                        '<div class="text-slate-500">' + archEsc(o.itemsSummary) + '</div>' +
+                        '<div class="text-[11px] text-slate-400">' + archEsc(o.date) + ' — ' + archEsc(o.status || '') + '</div></div>';
+                    ARCH.cursor = d;
+                });
+                list.insertAdjacentHTML('beforeend', html);
+                ARCH.loaded += snap.size;
+                const more = document.getElementById('archiveMoreBtn');
+                if (snap.size === 50) { more.classList.remove('hidden'); } else { more.classList.add('hidden'); if (!ARCH.loaded) list.innerHTML = '<div class="text-xs text-slate-500">مفيش طلبات في اليوم ده.</div>'; }
+            } catch (e) { console.error(e); alert('تعذر تحميل الطلبات.'); }
+            ARCH.busy = false;
+        };
+        window.archiveWeek = async function () {
+            const box = document.getElementById('archiveWeek');
+            if (!db || !state.isAdmin) return;
+            box.textContent = 'جاري التحميل...';
+            try {
+                const now = new Date(); let rows = '';
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+                    const r = archDayRange(archFmt(d));
+                    const g = await archAgg(r[0], r[1]);
+                    rows += '<div class="flex justify-between text-xs py-1 border-b border-slate-100"><span>' + archFmt(d) + '</span><span>' + g.c + ' طلب — <b>' + Number(g.t).toLocaleString('en-US') + ' ج.م</b></span></div>';
+                }
+                box.innerHTML = rows;
+            } catch (e) { console.error(e); box.textContent = 'تعذر التحميل.'; }
+        };
+        (function () { const t = setInterval(() => { const el = document.getElementById('archiveDate'); if (el) { clearInterval(t); el.value = archFmt(new Date()); } }, 500); })();
 
         function renderOrderStats() {
             const box = document.getElementById('adminOrderStats');
