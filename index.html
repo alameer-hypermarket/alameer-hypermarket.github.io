@@ -3092,7 +3092,13 @@ ${itemsLines}━━━━━━━━━━━━━━
                 const u = (typeof auth !== 'undefined' && auth && auth.currentUser) || state.user;
                 if (!u || !u.getIdToken) return null;
                 const idToken = await u.getIdToken();
-                const r = await fetch('/api/notify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ type, idToken }, extra || {})) });
+                const body = JSON.stringify(Object.assign({ type, idToken }, extra || {}));
+                if (!/pages\.dev$/.test(location.host)) {
+                    // الدالة موجودة على pages.dev بس: من github.io نبعت من غير قراءة الرد
+                    await fetch('https://alameer-hypermarket.pages.dev/api/notify', { method: 'POST', mode: 'no-cors', headers: { 'content-type': 'text/plain' }, body });
+                    return { ok: true, opaque: true };
+                }
+                const r = await fetch('/api/notify', { method: 'POST', headers: { 'content-type': 'application/json' }, body });
                 return await r.json();
             } catch (e) { console.error('notify error', e); return null; }
         }
@@ -3401,6 +3407,7 @@ ${itemsLines}━━━━━━━━━━━━━━
         window.showToast = function(msg) {
             const el = document.getElementById('toastNotification');
             document.getElementById('toastMessage').textContent = msg;
+            el.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);right:auto;bottom:auto;z-index:100000';
             el.classList.remove('hidden');
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => el.classList.add('hidden'), 2500);
