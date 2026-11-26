@@ -1,4 +1,4 @@
-const C='alameer-v6';
+const C='alameer-v7';
 const SWR=u=>u.pathname.startsWith('/img/')||u.pathname==='/products.json'||u.pathname==='/images.json';
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/'])).catch(()=>{}))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});

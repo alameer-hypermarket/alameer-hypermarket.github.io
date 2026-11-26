@@ -303,11 +303,8 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                                 <input type="tel" id="custPhone" placeholder="01xxxxxxxxx" dir="ltr" class="w-full bg-white border border-slate-200 focus:border-primary-700 rounded-lg px-3 py-2 text-sm text-right outline-none">
                             </div>
                         </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700">🚚 سعر التوصيل بيتحدد بعد ما المحل يأكد عنوانك، وبيتضاف على الإجمالي في الفاتورة.</div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">المنطقة (لتحديد سعر التوصيل) *</label>
-                            <select id="custZoneSelect" onchange="updateCartUI()" class="w-full bg-white border border-slate-200 focus:border-primary-700 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 outline-none"><option value="">-- اختر منطقتك لحساب التوصيل --</option><option value="z1">وسط البلد (توصيل: 15 ج.م)</option><option value="z2">مناطق قريبة (توصيل: 20 ج.م)</option><option value="z3">مناطق بعيدة (توصيل: 30 ج.م)</option><option value="z4">استلام من الفرع (توصيل: 0 ج.م)</option></select>
-                        </div>
 
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">العنوان بالتفصيل والدور / الشقة *</label>
@@ -389,11 +386,11 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                         <span id="summarySubtotal" class="font-bold text-slate-800">0 ج.م</span>
                     </div>
                     <div class="flex justify-between text-slate-500">
-                        <span>توصيل (<span id="summaryZoneLabel">اختر المنطقة</span>):</span>
+                        <span>توصيل (<span id="summaryZoneLabel">يحدده المحل</span>):</span>
                         <span id="summaryDelivery" class="font-bold text-slate-800">0 ج.م</span>
                     </div>
                     <div class="flex justify-between text-base font-extrabold text-slate-900 pt-2 border-t border-slate-100">
-                        <span>الإجمالي المطلوب:</span>
+                        <span>الإجمالي (بدون التوصيل):</span>
                         <span id="summaryTotal" class="text-primary-700">0 ج.م</span>
                     </div>
                 </div>
@@ -458,7 +455,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             <button onclick="switchAdminTab('products')" id="adminTab-products" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-primary-700 text-primary-700 whitespace-nowrap cursor-pointer">
                 المنتجات والأسعار
             </button>
-            <button onclick="switchAdminTab('zones')" id="adminTab-zones" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer">
+            <button onclick="switchAdminTab('zones')" id="adminTab-zones" style="display:none" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer">
                 مناطق التوصيل
             </button>
             <button onclick="switchAdminTab('settings')" id="adminTab-settings" class="admin-tab-btn py-3.5 px-3.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap cursor-pointer">
@@ -1370,6 +1367,25 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             }
         }
 
+        window.setOrderDelivery = async function(orderNum) {
+            const order = (state.orders || []).find(o => String(o.orderNum) === String(orderNum));
+            const input = document.getElementById('delFee_' + orderNum);
+            if (!order || !input) return;
+            const fee = parseFloat(input.value);
+            if (isNaN(fee) || fee < 0) { alert('اكتب سعر التوصيل بالجنيه (صفر لو مجاني).'); return; }
+            order.deliveryFee = fee;
+            order.deliveryPending = false;
+            order.total = (Number(order.subtotal) || 0) + fee;
+            const feeText = fee === 0 ? 'مجاني' : fee + ' ج.م';
+            let msg = String(order.messageText || '');
+            msg = msg.replace(/\*توصيل:\*[^\n]*/, '*توصيل:* ' + feeText).replace(/\*الإجمالي[^\n]*/, '*الإجمالي النهائي:* *' + order.total + ' ج.م*');
+            order.messageText = msg;
+            order.customerMessage = 'أهلاً ' + order.customerName + '، تم تأكيد طلبك #' + order.orderNum + '\nقيمة المنتجات: ' + order.subtotal + ' ج.م\nالتوصيل: ' + feeText + '\nالإجمالي: ' + order.total + ' ج.م';
+            await syncOrderToCloud(order);
+            renderAdminOrders();
+            if (window.showToast) window.showToast('تم تحديد التوصيل وتحديث الإجمالي');
+        };
+
         window.deleteOrderById = async function(orderNum) {
             if (!confirm('متأكد إنك عايز تمسح الطلب ' + orderNum + '؟ مش هينفع ترجعه تاني.')) return;
             try {
@@ -1583,11 +1599,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
 
         function updateFreeShipStrip(subtotal) {
             var el = document.getElementById('freeShipText'); if (!el) return;
-            var t = Number(state.config.freeDeliveryThreshold) || 0;
-            if (t <= 0) { el.textContent = '🚚 توصيل سريع لجميع المناطق • الدفع كاش أو محفظة إلكترونية أو إنستاباي'; return; }
-            if (subtotal > 0 && subtotal >= t) el.innerHTML = '🎉 <strong>توصيلك مجاني</strong> على هذا الطلب';
-            else if (subtotal > 0) el.innerHTML = '🚚 أضف <strong>' + (t - subtotal) + ' ج.م</strong> للحصول على توصيل مجاني';
-            else el.innerHTML = '🚚 <strong>توصيل مجاني</strong> للطلبات فوق ' + t + ' ج.م';
+            el.textContent = '🚚 توصيل لحد البيت • سعر التوصيل بيتحدد بعد تأكيد العنوان • الدفع كاش أو محفظة إلكترونية أو إنستاباي';
         }
         function syncHeaderHeight() {
             var h = document.getElementById('siteHeader');
@@ -1606,13 +1618,6 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
             document.getElementById('footerPhonesDisplay').textContent = `${p1} / ${p2}`;
             document.title = `${state.config.storeName} | تسوق أونلاين`;
 
-            const zoneSelect = document.getElementById('custZoneSelect');
-            const prevSelected = zoneSelect.value;
-            zoneSelect.innerHTML = `<option value="">-- اختر منطقتك لحساب التوصيل --</option>` +
-                state.config.zones.map(z => `<option value="${z.id}">${z.name} (توصيل: ${z.fee} ج.م)</option>`).join('');
-            if (prevSelected && state.config.zones.some(z => z.id === prevSelected)) {
-                zoneSelect.value = prevSelected;
-            }
 
             const transferList = document.getElementById('checkoutTransferNumbersList');
             transferList.innerHTML = [p1, p2].filter(Boolean).map(num => `
@@ -1962,23 +1967,10 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 `;
             }).join('');
 
-            const selectedZoneId = document.getElementById('custZoneSelect')?.value || '';
-            const zoneObj = state.config.zones.find(z => z.id === selectedZoneId);
-            const threshold = Number(state.config.freeDeliveryThreshold) || 0;
-
+            const zoneObj = null;
+            const threshold = 0;
             let deliveryFee = 0;
-            let zoneLabel = 'حسب المنطقة';
-
-            if (zoneObj) {
-                zoneLabel = zoneObj.name;
-                if (zoneObj.fee === 0) {
-                    deliveryFee = 0;
-                } else if (threshold > 0 && subtotal >= threshold) {
-                    deliveryFee = 0;
-                } else {
-                    deliveryFee = Number(zoneObj.fee) || 0;
-                }
-            }
+            let zoneLabel = 'يحدده المحل';
 
             const grandTotal = subtotal + deliveryFee;
 
@@ -1997,15 +1989,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
 
             updateFreeShipStrip(subtotal);
             const deliveryBanner = document.getElementById('freeDeliveryBanner');
-            if (threshold > 0) {
-                if (subtotal >= threshold) {
-                    deliveryBanner.innerHTML = `مبروك! حصلت على <strong class="text-primary-700">توصيل مجاني</strong> لهذا الطلب.`;
-                } else {
-                    deliveryBanner.innerHTML = `أضف منتجات بقيمة <strong>${threshold - subtotal} ج.م</strong> للحصول على توصيل مجاني لأي منطقة.`;
-                }
-            } else {
-                deliveryBanner.innerHTML = `يتم تحديد رسوم التوصيل تلقائياً حسب منطقتك.`;
-            }
+            deliveryBanner.innerHTML = `سعر التوصيل بيتحدد بعد ما المحل يأكد عنوانك.`;
 
             const isEmpty = totalCount === 0;
             document.getElementById('emptyCartView').classList.toggle('hidden', !isEmpty);
@@ -2017,9 +2001,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 document.getElementById('cartItemsContainer').innerHTML = itemsHtml;
                 document.getElementById('summarySubtotal').textContent = `${subtotal} ج.م`;
                 document.getElementById('summaryZoneLabel').textContent = zoneLabel;
-                document.getElementById('summaryDelivery').textContent = !zoneObj
-                    ? 'اختر المنطقة'
-                    : (deliveryFee === 0 ? 'مجاني' : `${deliveryFee} ج.م`);
+                document.getElementById('summaryDelivery').textContent = 'بعد تأكيد العنوان';
                 document.getElementById('summaryTotal').textContent = `${grandTotal} ج.م`;
             }
         };
@@ -2040,7 +2022,6 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
         window.submitOrderViaWhatsApp = async function() {
             const name = document.getElementById('custName').value.trim();
             const phone = document.getElementById('custPhone').value.trim();
-            const zoneId = document.getElementById('custZoneSelect').value;
             const address = document.getElementById('custAddress').value.trim();
             const landmark = document.getElementById('custLandmark').value.trim();
             const notes = (document.getElementById('custNotes')?.value || '').trim().slice(0, 500);
@@ -2057,20 +2038,12 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 errorEl.classList.remove('hidden');
                 return;
             }
-            if (!zoneId) {
-                errorEl.textContent = 'يرجى اختيار المنطقة لحساب تكلفة التوصيل.';
-                errorEl.classList.remove('hidden');
-                return;
-            }
             if (!address || address.length < 4) {
                 errorEl.textContent = 'يرجى إدخال العنوان بالتفصيل والدور / الشقة.';
                 errorEl.classList.remove('hidden');
                 return;
             }
             errorEl.classList.add('hidden');
-
-            const zoneObj = state.config.zones.find(z => z.id === zoneId) || { name: 'غير محدد', fee: 0 };
-            const threshold = Number(state.config.freeDeliveryThreshold) || 0;
 
             const orderNum = 'AM-' + Math.floor(1000 + Math.random() * 9000);
             const entries = Object.entries(state.cart);
@@ -2087,7 +2060,7 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
                 itemsSummaryList.push(`${product.name} (×${qty})`);
             });
 
-            const deliveryFee = (zoneObj.fee === 0 || (threshold > 0 && subtotal >= threshold)) ? 0 : (Number(zoneObj.fee) || 0);
+            const deliveryFee = 0;
             const grandTotal = subtotal + deliveryFee;
 
             const payLabels = {
@@ -2105,15 +2078,14 @@ try{var __c=JSON.parse(localStorage.getItem('al_ameer_config_v5')||'null');windo
 *رقم الأوردر:* #${orderNum}
 *الاسم:* ${name}
 *الموبايل:* ${phone}
-*المنطقة:* ${zoneObj.name}
 *العنوان والدور:* ${address}
 ${landmarkLine}${notesLine}*وسيلة الدفع:* ${payLabels[payMethod]}
 ━━━━━━━━━━━━━━
 *الأصناف المطلوبة:*
 ${itemsLines}━━━━━━━━━━━━━━
 *قيمة المنتجات:* ${subtotal} ج.م
-*توصيل (${zoneObj.name}):* ${deliveryFee === 0 ? 'مجاني' : deliveryFee + ' ج.م'}
-*الإجمالي النهائي:* *${grandTotal} ج.م*`;
+*توصيل:* يتحدد بعد تأكيد العنوان
+*الإجمالي (بدون التوصيل):* *${grandTotal} ج.م*`;
 
             state.lastGeneratedReceipt = messageText;
 
@@ -2121,7 +2093,8 @@ ${itemsLines}━━━━━━━━━━━━━━
                 orderNum,
                 customerName: name,
                 customerPhone: phone,
-                zoneName: zoneObj.name,
+                zoneName: '',
+                deliveryPending: true,
                 address,
                 landmark,
                 notes,
@@ -2793,7 +2766,7 @@ ${itemsLines}━━━━━━━━━━━━━━
                             <span class="text-slate-500" dir="ltr">(${order.customerPhone})</span>
                             <span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">${order.paymentMethod || 'كاش'}</span>
                         </div>
-                        <p class="text-slate-700"><strong>المنطقة:</strong> ${order.zoneName || ''} — <strong>العنوان:</strong> ${order.address}</p>
+                        <p class="text-slate-700">${order.zoneName ? '<strong>المنطقة:</strong> ' + order.zoneName + ' — ' : ''}<strong>العنوان:</strong> ${order.address}</p>
                         ${order.landmark ? `<p class="text-slate-600"><strong>علامة مميزة:</strong> ${order.landmark}</p>` : ''}
                         ${order.notes ? `<p class="text-amber-700 bg-amber-50 rounded px-2 py-1"><strong>ملاحظات:</strong> ${order.notes}</p>` : ''}
                         <p class="text-slate-500"><strong>الطلبات:</strong> ${order.itemsSummary}</p>
@@ -2801,6 +2774,12 @@ ${itemsLines}━━━━━━━━━━━━━━
                     </div>
                     <div class="flex sm:flex-col items-center sm:items-end justify-between gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                         <span class="font-extrabold text-slate-900 text-base">${order.total} ج.م</span>
+                        ${order.deliveryPending ? '<span class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded px-2 py-0.5">التوصيل لسه متحددش</span>' : '<span class="text-[11px] text-slate-500">منها توصيل ' + (Number(order.deliveryFee) || 0) + ' ج.م</span>'}
+                        <div class="flex items-center gap-1">
+                            <input type="number" min="0" id="delFee_${order.orderNum}" value="${order.deliveryPending ? '' : (Number(order.deliveryFee) || 0)}" placeholder="سعر التوصيل" class="w-24 border border-slate-200 rounded-lg px-2 py-1 text-xs text-center outline-none">
+                            <button type="button" onclick="setOrderDelivery('${order.orderNum}')" class="text-xs font-bold text-white bg-primary-700 rounded-lg px-2.5 py-1">تأكيد</button>
+                        </div>
+                        ${order.deliveryPending ? '' : `<a href="https://wa.me/${formatEgyptWhatsApp(order.customerPhone)}?text=${encodeURIComponent(order.customerMessage || '')}" target="_blank" rel="noopener noreferrer" class="text-xs font-bold text-green-700 hover:underline">إرسال الإجمالي للعميل ↗</a>`}
                         <a href="https://wa.me/${formatEgyptWhatsApp(primary)}?text=${encodeURIComponent(order.messageText)}"
                            target="_blank" rel="noopener noreferrer"
                            class="text-xs font-bold text-primary-700 hover:underline">
