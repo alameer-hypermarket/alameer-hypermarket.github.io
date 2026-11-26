@@ -1,4 +1,4 @@
-const C='alameer-v17';
+const C='alameer-v18';
 const SWR=u=>u.pathname.startsWith('/img/');
 const NF=u=>u.pathname==='/products.json'||u.pathname==='/images.json';
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['/'])).catch(()=>{}))});
